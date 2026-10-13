@@ -12,14 +12,16 @@
     veri: null, sonBasari: 0, hata: '', yukleniyor: false, onbellek: false,
     filtre: 'hepsi', ara: '', araAcik: false,
     tf: oku('dkc-tf', 'h1'), seviyeGoster: oku('dkc-seviye', null), grafik: null, form: '',
-    favori: oku('dkc-favori', []), poz: oku('dkc-pozisyon', []), sermaye: oku('dkc-sermaye', null)
+    favori: oku('dkc-favori', []), poz: oku('dkc-pozisyon', []), sermaye: oku('dkc-sermaye', null),
+    cihaz: oku('dkc-cihaz', ''), alarmForm: '', esleme: { adim: '', hata: '', mesgul: false }
   };
+  var CANLI = AYAR.api ? window.DKC_CANLI : null;
   var ADI = { long: 'Long hazırlığı', short: 'Short hazırlığı', bekle: 'Bekle', uzak: 'Uzak dur' };
   var SIRA = { long: 0, short: 0, bekle: 1, uzak: 2 };
   var TF = [['m15', '15dk', '15 dakika'], ['h1', '1S', '1 saat'], ['h4', '4S', '4 saat'], ['d', '1G', '1 gün']];
   var TF_ADI = { d: '1 gün', h4: '4 saat', h1: '1 saat' };
   var YON = { yukari: ['Yukarı', 'var(--long)'], asagi: ['Aşağı', 'var(--short)'], yatay: ['Yatay', 'var(--bekle)'], onay: ['Onay var', 'var(--long)'], bekliyor: ['Onay bekleniyor', 'var(--bekle)'], yok: ['Sinyal yok', 'var(--uzak)'] };
-  var ALARM_ADI = { giris: 'Giriş bölgesi', stop: 'Stop', tp1: 'Hedef 1', tp2: 'Hedef 2', ani: 'Ani hareket' };
+  var ALARM_ADI = { giris: 'Giriş bölgesi', stop: 'Stop', tp1: 'Hedef 1', tp2: 'Hedef 2', ani: 'Ani hareket', alarm: 'Fiyat alarmı' };
   var TAM_IKON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var KUCUK_IKON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var YILDIZ = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" fill="currentColor"/></svg>';
@@ -32,6 +34,9 @@
   function degisim(x) { if (x == null || isNaN(x)) return '–'; return (x > 0 ? '+' : x < 0 ? '−' : '') + '%' + f(Math.abs(x), Math.abs(x) < 10 ? 1 : 0); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function saat(ms) { var d = new Date(ms); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  // Canlı fiyatla güncellenecek yerler: data-cf (fiyat) ve data-cd (24s değişim)
+  function cf(c) { return ' data-cf="' + esc(c.coin) + '"'; }
+  function cd(c) { return ' data-cd="' + esc(c.coin) + '"'; }
   function rozet(d) { return '<span class="durum d-' + d + '">' + ADI[d] + '</span>'; }
   function uyari() { return '<p class="uyari">Yatırım tavsiyesi değildir. Analiz günde 2 kez yenilenir. Kazanç/risk ve kâr/zarar ücret ve funding hariçtir. Emirleri MEXC’de siz verirsiniz.</p>'; }
 
@@ -48,6 +53,7 @@
     j.coinler = (Array.isArray(j.coinler) ? j.coinler : []).map(H.coinTemizle).filter(Boolean);
     j.alarmlar = Array.isArray(j.alarmlar) ? j.alarmlar : [];
     j.tetiklenen = Array.isArray(j.tetiklenen) ? j.tetiklenen : [];
+    if (CANLI) j.coinler.forEach(canliUygula);
     return j;
   }
   function ozetYukle() {
@@ -56,6 +62,7 @@
     return api({ f: 'ozet' }).then(function (j) {
       durum.veri = veriHazirla(j); durum.sonBasari = Date.now(); durum.hata = ''; durum.onbellek = false;
       yaz('dkc-son', { t: durum.sonBasari, veri: j });
+      if (CANLI) CANLI.baslat(durum.veri.coinler.map(function (c) { return c.coin; }));
     }).catch(function (e) {
       durum.hata = navigator.onLine === false ? 'internet' : e && e.sunucu ? 'sunucu: ' + e.message : 'baglanti';
     }).then(function () { durum.yukleniyor = false; });
@@ -64,6 +71,39 @@
     if (!AYAR.api) return Promise.resolve(window.KOKPIT_ORNEK_MUM(coin, tf, fiyat));
     return api({ f: 'mum', coin: coin, tf: tf }).then(function (j) { return j.mumlar; });
   }
+  // Yazma istekleri (alarm kurma, eşleme): düz metin gövdeli POST, tarayıcı ön kontrol istemez
+  function apiYaz(govde) {
+    var ctrl = window.AbortController ? new AbortController() : null, zaman = setTimeout(function () { if (ctrl) ctrl.abort(); }, 20000);
+    return fetch(AYAR.api, { method: 'POST', body: JSON.stringify(Object.assign({ k: AYAR.anahtar }, govde)), signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error('Sunucu ' + r.status); return r.json(); })
+      .then(function (j) { clearTimeout(zaman); if (j && j.hata) { if (j.hata === 'Cihaz eşli değil') { durum.cihaz = ''; yaz('dkc-cihaz', ''); } throw new Error(j.hata); } return j; },
+        function (e) { clearTimeout(zaman); throw e && e.name === 'AbortError' ? new Error('Sunucu yanıt vermedi') : e; });
+  }
+
+  // ---------- Canlı fiyat (MEXC akışı) ----------
+  function canliUygula(c) { var l = CANLI && CANLI.fiyat(c.coin); if (l && isFinite(l.fiyat) && l.fiyat > 0) { c.fiyat = l.fiyat; c.deg24 = l.deg24; if (isFinite(l.funding)) c.funding = l.funding; } }
+  var boyanacak = {}, boyaZaman = null, sonDetay = 0, sonGrup = 0;
+  function canliBoya() {
+    boyaZaman = null; var liste = Object.keys(boyanacak); boyanacak = {};
+    if (!durum.veri) return;
+    liste.forEach(function (k) {
+      var c = coinBul(k); if (!c) return; canliUygula(c);
+      document.querySelectorAll('[data-cf="' + k + '"]').forEach(function (el) { el.textContent = f(c.fiyat); });
+      document.querySelectorAll('[data-cd="' + k + '"]').forEach(function (el) { el.textContent = degisim(c.deg24); el.classList.toggle('art', c.deg24 >= 0); el.classList.toggle('eks', c.deg24 < 0); });
+    });
+    var simdi = Date.now();
+    // Kâr/zarar ve "girişe %" yazıları birkaç saniyede bir yenilenir (yazarken veya form açıkken dokunulmaz)
+    var yaziyor = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+    if (liste.indexOf(aktifCoin()) >= 0 && simdi - sonDetay > 3000 && !durum.form && !durum.alarmForm && !yaziyor) { sonDetay = simdi; detayGuncelle(); }
+    var gr = $('gruplar');
+    if (gr && !yaziyor && simdi - sonGrup > 5000) { sonGrup = simdi; gr.innerHTML = grupHtml(gruplar()); }
+  }
+  if (CANLI) {
+    CANLI.on('fiyat', function (coin) { boyanacak[coin] = 1; if (!boyaZaman) boyaZaman = setTimeout(canliBoya, 1000); });
+    CANLI.on('durum', function () { tazelikGuncelle(); });
+    CANLI.on('mum', function (k) { grafikCanli(k); });
+  }
+
   function coinBul(coin) { return durum.veri ? durum.veri.coinler.filter(function (x) { return x.coin === coin; })[0] : null; }
   function pozBul(coin) { return durum.poz.filter(function (p) { return p.coin === coin; })[0]; }
   function fiyatlar() { var o = {}; (durum.veri ? durum.veri.coinler : []).forEach(function (c) { o[c.coin] = c.fiyat; }); return o; }
@@ -76,6 +116,7 @@
     if (!durum.veri) { yazi = durum.hata ? 'Veri alınamadı' : 'Yükleniyor…'; cls = durum.hata ? 'kotu' : 'bekle'; }
     else if (navigator.onLine === false) { yazi = 'İnternet yok · veri ' + saat(t); cls = 'kotu'; }
     else if (durum.hata) { yazi = 'Bağlantı sorunu · veri ' + saat(t); cls = 'orta'; }
+    else if (CANLI && CANLI.durum() === 'bagli') yazi = 'Canlı fiyat';
     else if (Date.now() - t > 3 * 60000) { yazi = 'Veri ' + saat(t) + ' · yenile'; cls = 'orta'; }
     else yazi = (durum.yukleniyor ? 'Yenileniyor… ' : 'Güncel · ') + saat(t);
     if (durum.veri && durum.veri.ornek) { yazi = 'Örnek veri'; cls = 'orta'; }
@@ -141,7 +182,7 @@
     return '<a class="cs" href="#/coin/' + encodeURIComponent(c.coin) + '"><span class="cs-serit" style="background:' + d.renk + '"></span>' +
       '<span class="cs-orta"><span class="cs-ad">' + esc(c.coin) + (favoriMi(c.coin) ? '<span class="cs-yildiz" aria-label="Favori">' + YILDIZ + '</span>' : '') + '</span>' +
       '<span class="cs-alt ' + d.yaziRenk + '">' + esc(d.yazi) + '</span></span>' +
-      '<span class="cs-sag"><span class="sayi">' + f(c.fiyat) + '</span><span class="sayi ' + (c.deg24 >= 0 ? 'art' : 'eks') + '">' + degisim(c.deg24) + '</span></span></a>';
+      '<span class="cs-sag"><span class="sayi"' + cf(c) + '>' + f(c.fiyat) + '</span><span class="sayi ' + (c.deg24 >= 0 ? 'art' : 'eks') + '"' + cd(c) + '>' + degisim(c.deg24) + '</span></span></a>';
   }
   function filtrele(liste) {
     var q = durum.ara.trim().toUpperCase();
@@ -190,8 +231,8 @@
       var d = coinDurumu(c);
       return '<a class="yan-satir' + (c.coin === aktif ? ' aktif' : '') + '" href="#/coin/' + encodeURIComponent(c.coin) + '"' + (c.coin === aktif ? ' aria-current="page"' : '') + '>' +
         '<span class="ys-nokta" style="background:' + d.renk + '"></span><span class="ys-ad">' + esc(c.coin) + (favoriMi(c.coin) ? ' <span class="cs-yildiz">' + YILDIZ + '</span>' : '') + '</span>' +
-        '<span class="ys-fiyat sayi">' + f(c.fiyat) + '</span><span class="ys-alt">' + esc(d.yazi) + '</span>' +
-        '<span class="ys-deg sayi ' + (c.deg24 >= 0 ? 'art' : 'eks') + '">' + degisim(c.deg24) + '</span></a>';
+        '<span class="ys-fiyat sayi"' + cf(c) + '>' + f(c.fiyat) + '</span><span class="ys-alt">' + esc(d.yazi) + '</span>' +
+        '<span class="ys-deg sayi ' + (c.deg24 >= 0 ? 'art' : 'eks') + '"' + cd(c) + '>' + degisim(c.deg24) + '</span></a>';
     }).join('') || '<p class="bos" style="padding:8px 14px">Eşleşen coin yok.</p>';
   }
   function yanHtml(aktif) {
@@ -225,7 +266,7 @@
     var hazir = g.giris;
     var planlar = '<section class="blok"><h2>Girişe gelenler</h2>' + (hazir.length ? '<div class="plan-kartlar">' + hazir.map(function (x) {
       var c = x[0], p = c.plan, h = H.planHesap(p);
-      return '<a class="plan-kart" href="#/coin/' + encodeURIComponent(c.coin) + '"><span class="pk-ust"><b>' + esc(c.coin) + '</b>' + rozet(c.durum) + '<span class="sayi pk-fiyat">' + f(c.fiyat) + '</span></span>' +
+      return '<a class="plan-kart" href="#/coin/' + encodeURIComponent(c.coin) + '"><span class="pk-ust"><b>' + esc(c.coin) + '</b>' + rozet(c.durum) + '<span class="sayi pk-fiyat"' + cf(c) + '>' + f(c.fiyat) + '</span></span>' +
         '<span class="pk-satir"><span>Giriş</span><span class="sayi">' + f(p.giris[0]) + ' – ' + f(p.giris[1]) + '</span></span>' +
         '<span class="pk-satir"><span>Stop</span><span class="sayi eks">' + f(p.stop) + '</span></span>' +
         '<span class="pk-satir"><span>Hedef 1 · 2</span><span class="sayi art">' + f(p.tp1) + ' · ' + f(p.tp2) + '</span></span>' +
@@ -243,7 +284,7 @@
       liste.map(function (c) {
         var d = coinDurumu(c);
         return '<tr data-git="#/coin/' + encodeURIComponent(c.coin) + '"><td><a href="#/coin/' + encodeURIComponent(c.coin) + '" class="t-coin"><span class="rozet kucuk">' + esc(c.coin.slice(0, 4)) + '</span>' + esc(c.coin) + (favoriMi(c.coin) ? ' <span class="cs-yildiz">' + YILDIZ + '</span>' : '') + '</a></td>' +
-          '<td class="sayi sag-h">' + f(c.fiyat) + '</td><td class="sayi sag-h ' + (c.deg24 >= 0 ? 'art' : 'eks') + '">' + degisim(c.deg24) + '</td>' +
+          '<td class="sayi sag-h"' + cf(c) + '>' + f(c.fiyat) + '</td><td class="sayi sag-h ' + (c.deg24 >= 0 ? 'art' : 'eks') + '"' + cd(c) + '>' + degisim(c.deg24) + '</td>' +
           '<td>' + rozet(c.durum) + '</td><td>' + sinyalNoktalari(c.tf) + '</td>' +
           '<td class="t-durum ' + d.yaziRenk + '">' + esc(d.yazi) + '</td>' +
           '<td class="t-ozet">' + esc(c.ozet || c.islemYok || '') + '</td></tr>';
@@ -266,7 +307,7 @@
       (h.ozet && !coin ? '<span class="h-ozet">' + esc(h.ozet) + '</span>' : '') +
       '<span class="etiketler"><span>Etki: ' + esc(h.etki) + '</span><span>' + esc(h.yon) + '</span><span>' + esc(h.kaynak) + ' · ' + esc(h.zaman) + '</span></span></div>';
   }
-  function alarmRenk(t) { return t === 'stop' ? 'var(--short)' : t === 'giris' ? 'var(--mavi)' : t === 'ani' ? 'var(--bekle)' : 'var(--long)'; }
+  function alarmRenk(t) { return t === 'stop' ? 'var(--short)' : t === 'giris' ? 'var(--mavi)' : t === 'ani' ? 'var(--bekle)' : t === 'alarm' ? 'var(--vurgu)' : 'var(--long)'; }
   function tetSatir(t) {
     return '<a class="satir" href="#/coin/' + encodeURIComponent(t.coin) + '"><span class="nokta" style="background:' + alarmRenk(t.tur) + '"></span><span class="ust-yazi">' + esc(t.coin) + ' · ' + esc(ALARM_ADI[t.tur] || t.tur) + '</span><span class="sag sayi">' + f(t.fiyat) + '</span><span class="alt-yazi">' + esc(t.zaman) + '</span></a>';
   }
@@ -336,21 +377,99 @@
     var poz = durum.form === c.coin ? pozFormHtml(c) :
       p ? '<section class="blok poz-blok"><div class="blok-ust"><h2>Pozisyonum</h2><span class="dugme-grup"><button class="dugme ikincil kucuk" data-form-ac>Düzenle</button><button class="dugme ikincil kucuk" data-poz-sil="' + esc(c.coin) + '">Kapattım</button></span></div>' + pozKartHtml(c, p, false) + '</section>' :
       '<button class="dugme genis" data-form-ac>İşleme girdim</button>';
-    return poz + '<section class="blok ne-yap">' + rozet(c.durum) + '<p>' + esc(c.ozet || '') + '</p>' + tfSatir(c.tf) + '</section>' + planHtml(c) +
+    return poz + alarmBlokHtml(c) + '<section class="blok ne-yap">' + rozet(c.durum) + '<p>' + esc(c.ozet || '') + '</p>' + tfSatir(c.tf) + '</section>' + planHtml(c) +
       '<section class="blok"><h2>Haberler</h2>' + (c.haberler.length ? c.haberler.slice(0, 3).map(function (h) { return haberSatir(h); }).join('') : '<p class="bos">Son 24 saatte önemli haber yok.</p>') + '</section>';
   }
+  // ---------- Uygulamadan fiyat alarmı ----------
+  function benimAlarmlarim(coin) { return (durum.veri.alarmlar || []).filter(function (a) { return a.kaynak === 'uygulama' && (!coin || a.coin === coin); }); }
+  function alarmYonYazi(c, seviye) {
+    if (!seviye || isNaN(seviye) || !c.fiyat) return 'Seviyeyi yazın.';
+    if (seviye === c.fiyat) return 'Seviye şu anki fiyatla aynı olamaz.';
+    return 'Fiyat ' + f(seviye) + (seviye > c.fiyat ? ' üstüne çıkınca' : ' altına inince') + ' bildirim gelir (şu an ' + f(c.fiyat) + ', ' + yuzde(Math.abs(seviye - c.fiyat) / c.fiyat * 100) + ' uzakta).';
+  }
+  function alarmBlokHtml(c) {
+    var l = benimAlarmlarim(c.coin), ic;
+    var liste = l.length ? '<div class="liste">' + l.map(function (a) {
+      return '<div class="satir"><span class="nokta" style="background:var(--vurgu)"></span><span class="ust-yazi sayi">' + f(a.seviye) + '</span>' +
+        '<button class="dugme ikincil kucuk alarm-sil" data-alarm-sil="' + esc(a.coin + '|' + a.kosul + '|' + a.seviye) + '" aria-label="' + esc(f(a.seviye)) + ' alarmını sil">Sil</button>' +
+        '<span class="alt-yazi">' + (a.kosul === 'ustune' ? 'Üstüne çıkınca' : 'Altına inince') + (a.not ? ' · ' + esc(a.not) : '') + '</span></div>';
+    }).join('') + '</div>' : '';
+    if (!AYAR.api) ic = '<p class="plan-not">Örnek veriyle alarm kurulamaz.</p>';
+    else if (durum.alarmForm === c.coin) ic = durum.cihaz ? alarmFormHtml(c) : eslemeHtml();
+    else ic = '<button class="dugme ikincil genis" data-alarm-ac>Fiyat alarmı kur</button>';
+    return '<section class="blok alarm-blok"><h2>Fiyat alarmlarım</h2>' + liste + ic + '</section>';
+  }
+  function alarmFormHtml(c) {
+    var b = basamak(c.fiyat || 1), v = c.fiyat ? Number(c.fiyat).toFixed(b).replace('.', ',') : '';
+    return '<form id="alarmForm" class="poz-form" data-coin="' + esc(c.coin) + '">' +
+      '<label class="alan"><span>Alarm seviyesi</span><input name="seviye" inputmode="decimal" autocomplete="off" value="' + esc(v) + '" required></label>' +
+      '<p class="plan-not" id="alarmYon">' + esc(alarmYonYazi(c, c.fiyat)) + '</p>' +
+      '<label class="alan"><span>Not (isteğe bağlı)</span><input name="not" maxlength="120" autocomplete="off" placeholder="ör. direnç kırılırsa bak"></label>' +
+      '<p class="form-hata" id="alarmHata" role="alert"></p>' +
+      '<div class="form-dugmeler"><button class="dugme" type="submit">Alarmı kur</button><button class="dugme ikincil" type="button" data-alarm-iptal>Vazgeç</button></div></form>';
+  }
+  function eslemeHtml() {
+    var e = durum.esleme;
+    return '<div class="esleme"><p class="plan-not">Bu cihazdan alarm kurmak için bir kez eşleme gerekir. Kod Telegram hesabınıza gelir; eşlenince bildirimler de yalnızca eşli cihazlarınıza gider.</p>' +
+      (e.adim === 'kod' ? '<form id="eslemeForm" class="poz-form"><label class="alan"><span>Telegram’a gelen 6 haneli kod</span><input name="kod" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>' +
+        '<div class="form-dugmeler"><button class="dugme" type="submit"' + (e.mesgul ? ' disabled' : '') + '>' + (e.mesgul ? 'Bekleyin…' : 'Eşle') + '</button><button class="dugme ikincil" type="button" data-kod-iste>Yeni kod</button></div></form>'
+        : '<div class="form-dugmeler"><button class="dugme" data-kod-iste' + (e.mesgul ? ' disabled' : '') + '>' + (e.mesgul ? 'Gönderiliyor…' : 'Telegram’a kod gönder') + '</button><button class="dugme ikincil" data-alarm-iptal>Vazgeç</button></div>') +
+      '<p class="form-hata" id="eslemeHata" role="alert">' + esc(e.hata) + '</p></div>';
+  }
+  function alarmBlokYenile() { var c = coinBul(aktifCoin()); var b = document.querySelector('.alarm-blok'); if (c && b) b.outerHTML = alarmBlokHtml(c); }
+  function kodIste() {
+    durum.esleme.mesgul = true; durum.esleme.hata = ''; alarmBlokYenile();
+    apiYaz({ f: 'kodIste' }).then(function () { durum.esleme.adim = 'kod'; }, function (e) { durum.esleme.hata = e.message; if (/bekleyin/.test(e.message)) durum.esleme.adim = 'kod'; })
+      .then(function () { durum.esleme.mesgul = false; alarmBlokYenile(); var i = document.querySelector('#eslemeForm input'); if (i) i.focus(); });
+  }
+  function eslestir(form) {
+    var kod = form.kod.value.replace(/\D/g, '');
+    if (kod.length !== 6) { $('eslemeHata').textContent = '6 haneli kodu yazın.'; return; }
+    durum.esleme.mesgul = true; alarmBlokYenile();
+    var abone = window.KOKPIT_BILDIRIM && window.KOKPIT_BILDIRIM.aboneId ? window.KOKPIT_BILDIRIM.aboneId() : Promise.resolve('');
+    abone.then(function (id) { return apiYaz({ f: 'esles', kod: kod, abone: id || '' }); }).then(function (j) {
+      durum.cihaz = j.t; yaz('dkc-cihaz', j.t); durum.esleme = { adim: '', hata: '', mesgul: false };
+    }, function (e) { durum.esleme.mesgul = false; durum.esleme.hata = e.message; if (/süresi doldu|Çok fazla/.test(e.message)) durum.esleme.adim = ''; })
+      .then(alarmBlokYenile);
+  }
+  function alarmKur(form) {
+    var c = coinBul(form.dataset.coin), sv = sayiOku(form.seviye.value), hata = $('alarmHata');
+    if (!c || !sv || isNaN(sv)) { hata.textContent = 'Geçerli bir seviye yazın.'; return; }
+    if (sv === c.fiyat) { hata.textContent = 'Seviye şu anki fiyatla aynı olamaz.'; return; }
+    var a = { coin: c.coin, kosul: sv > c.fiyat ? 'ustune' : 'altina', seviye: sv, not: form.not.value.trim().slice(0, 120) };
+    var dugme = form.querySelector('[type=submit]'); dugme.disabled = true; dugme.textContent = 'Kuruluyor…'; hata.textContent = '';
+    apiYaz({ f: 'alarmEkle', t: durum.cihaz, coin: a.coin, kosul: a.kosul, seviye: a.seviye, not: a.not }).then(function (j) {
+      if (!j.zaten) durum.veri.alarmlar.push({ coin: a.coin, tur: 'alarm', seviye: a.seviye, kosul: a.kosul, kaynak: 'uygulama', not: a.not, durum: 'bekliyor' });
+      durum.alarmForm = ''; detayGuncelle(); grafikKur(c);
+    }, function (e) {
+      if (!durum.cihaz) { alarmBlokYenile(); return; }
+      hata.textContent = e.message; dugme.disabled = false; dugme.textContent = 'Alarmı kur';
+    });
+  }
+  function alarmSil(anahtar, dugme) {
+    var p = anahtar.split('|'), sv = Number(p[2]);
+    if (!window.confirm(p[0] + ' ' + f(sv) + ' alarmını silmek istiyor musunuz?')) return;
+    if (!durum.cihaz) { durum.alarmForm = p[0]; alarmBlokYenile(); return; }
+    dugme.disabled = true; dugme.textContent = '…';
+    apiYaz({ f: 'alarmSil', t: durum.cihaz, coin: p[0], kosul: p[1], seviye: sv }).then(function () {
+      durum.veri.alarmlar = durum.veri.alarmlar.filter(function (a) { return !(a.kaynak === 'uygulama' && a.coin === p[0] && a.kosul === p[1] && a.seviye === sv); });
+      goster();
+    }, function (e) { dugme.disabled = false; dugme.textContent = 'Sil'; window.alert('Silinemedi: ' + e.message); if (!durum.cihaz) { durum.alarmForm = p[0]; alarmBlokYenile(); } });
+  }
+
   function detayEkran(coin) {
     var c = coinBul(coin);
     if (!c) return '<a class="geri" href="#/">← Kokpit</a><p class="bos">' + esc(coin) + ' listede yok.</p>';
     var fav = favoriMi(c.coin), seviye = seviyeAcik();
     return '<div class="d-ust"><a class="geri-ikon" href="#/" aria-label="Geri"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>' +
-      '<h1>' + esc(c.coin) + '</h1><span class="sayi d-fiyat" id="dFiyat">' + f(c.fiyat) + '</span><span class="sayi d-deg ' + (c.deg24 >= 0 ? 'art' : 'eks') + '" id="dDeg">' + degisim(c.deg24) + '</span>' +
+      '<h1>' + esc(c.coin) + '</h1><span class="sayi d-fiyat" id="dFiyat"' + cf(c) + '>' + f(c.fiyat) + '</span><span class="sayi d-deg ' + (c.deg24 >= 0 ? 'art' : 'eks') + '" id="dDeg">' + degisim(c.deg24) + '</span>' +
       '<button class="yildiz-dugme' + (fav ? ' acik' : '') + '" data-favori="' + esc(c.coin) + '" aria-pressed="' + fav + '" aria-label="' + (fav ? 'Favorilerden çıkar' : 'Favorilere ekle') + '">' + YILDIZ + '</button></div>' +
       '<div class="detay"><section class="blok grafik-blok"><div class="grafik-ust"><div class="sekmeler" role="group" aria-label="Zaman dilimi">' +
       TF.map(function (t) { return '<button data-tf="' + t[0] + '" aria-pressed="' + (durum.tf === t[0]) + '" aria-label="' + t[2] + '">' + t[1] + '</button>'; }).join('') +
       '</div><div class="grafik-arac"><button class="tam-dugme" data-seviye aria-pressed="' + seviye + '">Seviyeler</button><button class="tam-dugme" id="tamEkran" title="Tam ekran (F)">' + TAM_IKON + '<span>Tam ekran</span></button></div></div>' +
-      '<span class="tam-baslik">' + esc(c.coin) + ' <span class="sayi">' + f(c.fiyat) + '</span></span>' +
+      '<span class="tam-baslik">' + esc(c.coin) + ' <span class="sayi"' + cf(c) + '>' + f(c.fiyat) + '</span></span>' +
       '<div id="grafik" role="img" aria-label="' + esc(c.coin) + ' mum grafiği"></div>' +
+      '<div class="rsi-kutu"><span class="rsi-et">RSI 14 <b id="rsiDeger">–</b></span><div id="rsiGrafik" aria-hidden="true"></div></div>' +
       '<div class="lejant">' + (pozBul(c.coin) ? '<span><i style="background:var(--mavi)"></i>Girişim</span>' : '') + (c.plan ? '<span><i style="background:var(--short)"></i>Stop</span><span><i style="background:var(--long)"></i>Hedefler</span>' : '') +
       (seviye ? '<span><i style="background:var(--mavi);opacity:.6"></i>Destek</span><span><i style="background:var(--bekle)"></i>Direnç</span>' : '') + '<span><i style="background:var(--ema)"></i>EMA50</span><span class="lejant-saat">Türkiye saati</span></div></section>' +
       '<div class="detay-sag" id="detaySag">' + detaySagHtml(c) + '</div></div>' +
@@ -360,7 +479,7 @@
   function detayGuncelle() {
     var c = coinBul(aktifCoin()); if (!c) return;
     if ($('dFiyat')) { $('dFiyat').textContent = f(c.fiyat); $('dDeg').textContent = degisim(c.deg24); $('dDeg').className = 'sayi d-deg ' + (c.deg24 >= 0 ? 'art' : 'eks'); }
-    if ($('detaySag') && !durum.form) $('detaySag').innerHTML = detaySagHtml(c);
+    if ($('detaySag') && !durum.form && !durum.alarmForm) $('detaySag').innerHTML = detaySagHtml(c);
   }
 
   // ---------- İşlemlerim ----------
@@ -390,15 +509,39 @@
       '<div class="alarm-iki"><section class="blok"><h2>Son çalan alarmlar</h2><div class="liste">' + (tet.length ? tet.map(tetSatir).join('') : '<p class="bos">Henüz çalan alarm yok.</p>') + '</div></section>' +
       '<section class="blok"><h2>Bekleyen alarmlar (' + al.length + ')</h2><div class="liste">' + (al.length ? al.map(function (a) {
         return '<a class="satir" href="#/coin/' + encodeURIComponent(a.coin) + '"><span class="nokta" style="background:' + alarmRenk(a.tur) + '"></span><span class="ust-yazi">' + esc(a.coin) + ' · ' + esc(ALARM_ADI[a.tur] || a.tur) + '</span>' +
-          '<span class="sag sayi">' + (a.tur === 'ani' ? '1 saatte ±%' + f(a.seviye, 0) : f(a.seviye)) + '</span><span class="alt-yazi">' + (a.tur === 'ani' ? 'Sert hareket olursa haber verir' : 'Fiyat bu seviyeye gelince haber verir') + '</span></a>';
-      }).join('') : '<p class="bos">Aktif plan olmadığı için alarm yok.</p>') + '</div></section></div>' +
-      '<p class="uyari">Alarmlar bilgi amaçlıdır. Gerçek koruma için stop emrinizi MEXC’de verin.</p>';
+          '<span class="sag sayi">' + (a.tur === 'ani' ? '1 saatte ±%' + f(a.seviye, 0) : f(a.seviye)) + '</span><span class="alt-yazi">' + (a.tur === 'ani' ? 'Sert hareket olursa haber verir' : a.kaynak === 'uygulama' ? 'Sizin alarmınız · ' + (a.kosul === 'ustune' ? 'üstüne çıkınca' : 'altına inince') + (a.not ? ' · ' + esc(a.not) : '') : 'Fiyat bu seviyeye gelince haber verir') + '</span></a>';
+      }).join('') : '<p class="bos">Bekleyen alarm yok. Coin sayfasından fiyat alarmı kurabilirsiniz.</p>') + '</div></section></div>' +
+      '<p class="uyari">Kendi fiyat alarmınızı coin sayfasındaki “Fiyat alarmı kur” ile kurar, orada silersiniz. Alarmlar bilgi amaçlıdır; gerçek koruma için stop emrinizi MEXC’de verin.</p>';
   }
 
   // ---------- Grafik ----------
   var TR_OFS = 3 * 3600; // grafikte Türkiye saati (UTC+3, yaz saati yok)
   function ema(veri, n) { var k = 2 / (n + 1), e = null; return veri.map(function (m) { e = e == null ? m.close : m.close * k + e * (1 - k); return { time: m.time, value: e }; }); }
-  function grafikKaldir() { if (durum.grafik) { try { durum.grafik.izle.disconnect(); durum.grafik.grafik.remove(); } catch (e) { /* zaten kaldırılmış */ } durum.grafik = null; } }
+  function grafikKaldir() {
+    if (CANLI) CANLI.mumIzle(null);
+    if (durum.grafik) { try { durum.grafik.izle.disconnect(); if (durum.grafik.rsiGrafik) durum.grafik.rsiGrafik.remove(); durum.grafik.grafik.remove(); } catch (e) { /* zaten kaldırılmış */ } durum.grafik = null; }
+  }
+  var HACIM_RENK = { art: 'rgba(47,191,128,0.32)', eks: 'rgba(239,90,82,0.32)' };
+  function hacimNokta(m) { return { time: m.time, value: Number(m.vol) || 0, color: m.close >= m.open ? HACIM_RENK.art : HACIM_RENK.eks }; }
+  // RSI çizgisi ilk 14 mumda boş nokta alır: iki grafiğin mum sıraları aynı kalsın (kaydırma eşlemesi için)
+  function rsiNoktalar(veri) {
+    var r = H.rsiSeri(veri.map(function (m) { return m.close; }), 14);
+    return veri.map(function (m, i) { return r[i] == null ? { time: m.time } : { time: m.time, value: r[i] }; });
+  }
+  function rsiYaz(deger) { var el = $('rsiDeger'); if (el) { el.textContent = deger == null ? '–' : f(deger, 0); el.className = deger >= 70 ? 'eks' : deger <= 30 ? 'art' : ''; } }
+  // Canlı mum: açık mumu günceller, yeni mum gelince ekler
+  function grafikCanli(k) {
+    var g = durum.grafik; if (!g || !g.veri || g.coin !== k.coin || g.tf !== k.tf) return;
+    var m = { time: k.time + TR_OFS, open: k.open, high: k.high, low: k.low, close: k.close, vol: k.vol }, v = g.veri, son = v[v.length - 1];
+    if (!son || m.time < son.time) return;
+    if (m.time === son.time) v[v.length - 1] = m; else { v.push(m); if (v.length > 400) v.shift(); }
+    try {
+      g.mum.update({ time: m.time, open: m.open, high: m.high, low: m.low, close: m.close });
+      if (g.hacim) g.hacim.update(hacimNokta(m));
+      var e = ema(v, 50); if (v.length >= 50) g.ort.update(e[e.length - 1]);
+      if (g.rsi) { var r = rsiNoktalar(v), sonR = r[r.length - 1]; if (sonR.value != null) { g.rsi.update(sonR); rsiYaz(sonR.value); } }
+    } catch (x) { /* grafik kapanırken gelen mum */ }
+  }
   function grafikKur(c) {
     var kutu = $('grafik'); if (!kutu || !window.LightweightCharts) return;
     grafikKaldir(); kutu.innerHTML = '';
@@ -406,7 +549,7 @@
     var g = LightweightCharts.createChart(kutu, {
       autoSize: true, layout: { background: { color: 'transparent' }, textColor: r('--sonuk'), fontFamily: 'IBM Plex Sans, system-ui, sans-serif' },
       grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-      rightPriceScale: { borderColor: r('--cizgi') }, timeScale: { borderColor: r('--cizgi'), timeVisible: durum.tf !== 'd' },
+      rightPriceScale: { borderColor: r('--cizgi'), minimumWidth: 64, scaleMargins: { top: 0.06, bottom: 0.2 } }, timeScale: { borderColor: r('--cizgi'), timeVisible: durum.tf !== 'd' },
       crosshair: { mode: 0 }, localization: { locale: 'tr-TR', priceFormatter: function (x) { return f(x); } }
     });
     var cz = c.cizim || {}, seviye = seviyeAcik(), poz = pozBul(c.coin), seviyeler = [];
@@ -418,6 +561,10 @@
         seviyeler.forEach(function (v) { if (v < lo && lo - v < ara * 0.6) lo = v; if (v > hi && v - hi < ara * 0.6) hi = v; }); return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 8, below: 8 } }; },
       upColor: r('--long'), downColor: r('--short'), wickUpColor: r('--long'), wickDownColor: r('--short'), borderVisible: false, priceFormat: { type: 'price', precision: basamak(c.fiyat || 1), minMove: Math.pow(10, -basamak(c.fiyat || 1)) } });
     var ort = g.addLineSeries({ color: r('--ema'), lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    var hacim = g.addHistogramSeries({ priceScaleId: 'hacim', priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false });
+    g.priceScale('hacim').applyOptions({ scaleMargins: { top: 0.84, bottom: 0 } });
+    // Kendi kurduğum fiyat alarmları
+    (durum.veri.alarmlar || []).forEach(function (a) { if (a.kaynak === 'uygulama' && a.coin === c.coin) mum.createPriceLine({ price: a.seviye, color: r('--vurgu'), lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: 'Alarm' }); });
     var cizgi = function (fiyat, renk, baslik, kesik, etiket) { mum.createPriceLine({ price: fiyat, color: renk, lineWidth: kesik ? 1 : 2, lineStyle: kesik ? 2 : 0, axisLabelVisible: etiket !== false, title: baslik }); };
     if (seviye) {
       (cz.destek || []).forEach(function (b) { cizgi(b[1], r('--mavi'), 'Destek', true); cizgi(b[0], r('--mavi'), '', true, false); });
@@ -425,7 +572,22 @@
     }
     if (c.plan) { cizgi(c.plan.stop, r('--short'), 'Stop', false); cizgi(c.plan.tp1, r('--long'), 'Hedef 1', false); if (c.plan.tp2 && (MASA.matches || seviye)) cizgi(c.plan.tp2, r('--long'), 'Hedef 2', false); }
     if (poz) { cizgi(poz.giris, r('--mavi'), 'Girişim', false); if (poz.stop && (!c.plan || poz.stop !== c.plan.stop)) cizgi(poz.stop, r('--short'), 'Stopum', true); }
-    var kayit = { grafik: g, izle: { disconnect: function () {} } }; durum.grafik = kayit;
+    var kayit = { grafik: g, izle: { disconnect: function () {} }, coin: c.coin, tf: durum.tf, mum: mum, ort: ort, hacim: hacim }; durum.grafik = kayit;
+    // RSI: ayrı küçük grafik, kaydırma ve yakınlaştırma ana grafikle eş
+    var rsiKutu = $('rsiGrafik');
+    if (rsiKutu) {
+      var rg = LightweightCharts.createChart(rsiKutu, {
+        autoSize: true, layout: { background: { color: 'transparent' }, textColor: r('--sonuk'), fontFamily: 'IBM Plex Sans, system-ui, sans-serif', fontSize: 10 },
+        grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { visible: false } },
+        rightPriceScale: { borderColor: r('--cizgi'), minimumWidth: 64, scaleMargins: { top: 0.1, bottom: 0.1 } }, timeScale: { visible: false },
+        crosshair: { mode: 0, horzLine: { visible: false } }, handleScroll: false, handleScale: false, localization: { locale: 'tr-TR' }
+      });
+      var rs = rg.addLineSeries({ color: r('--mavi'), lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: function () { return { priceRange: { minValue: 0, maxValue: 100 } }; }, priceFormat: { type: 'price', precision: 0, minMove: 1 } });
+      [70, 30].forEach(function (x) { rs.createPriceLine({ price: x, color: 'rgba(255,255,255,0.25)', lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' }); });
+      kayit.rsiGrafik = rg; kayit.rsi = rs;
+      g.timeScale().subscribeVisibleLogicalRangeChange(function (ar) { if (ar && durum.grafik === kayit) rg.timeScale().setVisibleLogicalRange(ar); });
+    }
     var bolgeler = [];
     if (seviye) {
       (cz.destek || []).forEach(function (b) { bolgeler.push([b, 'rgba(90,169,255,0.13)']); });
@@ -448,8 +610,12 @@
     mumYukle(c.coin, tf, c.fiyat).then(function (veri) {
       if (durum.grafik !== kayit) return; // bu sırada başka grafik açıldı: eski yanıtı at
       if (!veri || !veri.length) throw new Error('bos');
-      veri = veri.map(function (m) { return { time: m.time + TR_OFS, open: m.open, high: m.high, low: m.low, close: m.close }; });
-      mum.setData(veri); ort.setData(ema(veri, 50).slice(49));
+      veri = veri.map(function (m) { return { time: m.time + TR_OFS, open: m.open, high: m.high, low: m.low, close: m.close, vol: m.vol }; });
+      mum.setData(veri.map(function (m) { return { time: m.time, open: m.open, high: m.high, low: m.low, close: m.close }; })); ort.setData(ema(veri, 50).slice(49));
+      if (veri[0].vol != null) hacim.setData(veri.map(hacimNokta));
+      if (kayit.rsi) { var rn = rsiNoktalar(veri); kayit.rsi.setData(rn); rsiYaz(rn[rn.length - 1].value); }
+      kayit.veri = veri;
+      if (CANLI) CANLI.mumIzle(c.coin, tf);
       if (seviye) (cz.trend || []).forEach(function (t) {
         var s = g.addLineSeries({ color: r('--bekle'), lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
         s.setData([{ time: t.t1 + TR_OFS, value: t.p1 }, { time: t.t2 + TR_OFS, value: t.p2 }]);
@@ -551,15 +717,24 @@
       fv.classList.toggle('acik', favoriMi(k)); fv.setAttribute('aria-pressed', favoriMi(k)); fv.setAttribute('aria-label', favoriMi(k) ? 'Favorilerden çıkar' : 'Favorilere ekle'); yanGuncelle(); return; }
     if (t.closest('[data-form-ac]')) { durum.form = aktifCoin(); $('detaySag').innerHTML = detaySagHtml(coinBul(durum.form)); var i = document.querySelector('#pozForm input[name=giris]'); if (i) i.focus(); return; }
     if (t.closest('[data-form-iptal]')) { durum.form = ''; detayGuncelle(); return; }
+    if (t.closest('[data-alarm-ac]')) { durum.alarmForm = aktifCoin(); alarmBlokYenile(); var ai = document.querySelector('#alarmForm input[name=seviye]'); if (ai) { ai.focus(); ai.select(); } return; }
+    if (t.closest('[data-alarm-iptal]')) { durum.alarmForm = ''; durum.esleme = { adim: '', hata: '', mesgul: false }; alarmBlokYenile(); return; }
+    if (t.closest('[data-kod-iste]')) { e.preventDefault(); kodIste(); return; }
+    var as = t.closest('[data-alarm-sil]'); if (as) { alarmSil(as.dataset.alarmSil, as); return; }
     var sil = t.closest('[data-poz-sil]'); if (sil) { e.preventDefault(); var sc = sil.dataset.pozSil; if (!window.confirm(sc + ' işlemini listeden çıkarmak istiyor musunuz?')) return; durum.poz = durum.poz.filter(function (x) { return x.coin !== sc; }); yaz('dkc-pozisyon', durum.poz); goster(); return; }
     var satir = t.closest('tr[data-git]'); if (satir && !t.closest('a')) { location.hash = satir.dataset.git; return; }
     if (t.closest('#bildirimAc') && window.KOKPIT_BILDIRIM) { window.KOKPIT_BILDIRIM.ac().then(goster); }
   });
-  document.addEventListener('submit', function (e) { if (e.target.id === 'pozForm') { e.preventDefault(); pozKaydet(e.target); } });
+  document.addEventListener('submit', function (e) {
+    if (e.target.id === 'pozForm') { e.preventDefault(); pozKaydet(e.target); }
+    else if (e.target.id === 'alarmForm') { e.preventDefault(); alarmKur(e.target); }
+    else if (e.target.id === 'eslemeForm') { e.preventDefault(); eslestir(e.target); }
+  });
   document.addEventListener('change', function (e) {
     if (e.target.id === 'sermaye') { var n = sayiOku(e.target.value); durum.sermaye = n && !isNaN(n) ? n : null; yaz('dkc-sermaye', durum.sermaye); goster(); }
   });
   document.addEventListener('input', function (e) {
+    if (e.target.name === 'seviye' && e.target.form && e.target.form.id === 'alarmForm') { var ac = coinBul(e.target.form.dataset.coin); if (ac) $('alarmYon').textContent = alarmYonYazi(ac, sayiOku(e.target.value)); return; }
     if (e.target.id === 'ara' || e.target.id === 'araYan') {
       durum.ara = e.target.value;
       var l = $('yanListe'); if (l) l.innerHTML = yanListeHtml(aktifCoin());
@@ -567,7 +742,7 @@
       if (e.target.id === 'araYan' && !aktifCoin() && MASA.matches && !location.hash.replace(/^#\/?/, '')) { var y = document.activeElement; goster(); if ($('araYan')) { $('araYan').focus(); $('araYan').setSelectionRange(y.value.length, y.value.length); } }
     }
   });
-  window.addEventListener('hashchange', function () { durum.form = ''; if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); goster(); window.scrollTo(0, 0); });
+  window.addEventListener('hashchange', function () { durum.form = ''; durum.alarmForm = ''; durum.esleme = { adim: '', hata: '', mesgul: false }; if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); goster(); window.scrollTo(0, 0); });
   MASA.addEventListener('change', function () { $('yan').innerHTML = ''; goster(); });
   // Uygulama öne gelince ya da internet dönünce hemen yenile
   document.addEventListener('visibilitychange', function () { if (!document.hidden && AYAR.api && Date.now() - durum.sonBasari > 30000) yenile(); });
@@ -581,6 +756,7 @@
     if (k && k.veri && AYAR.api) { try { durum.veri = veriHazirla(k.veri); durum.sonBasari = k.t || 0; durum.onbellek = true; } catch (e) { durum.veri = null; } }
   })();
   goster();
+  if (CANLI && durum.veri) CANLI.baslat(durum.veri.coinler.map(function (c) { return c.coin; }));
   yenile();
   setInterval(function () { if (document.hidden || !AYAR.api) return; yenile(); }, 60000);
   setInterval(tazelikGuncelle, 30000);

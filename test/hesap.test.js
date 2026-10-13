@@ -47,4 +47,11 @@ t('coinTemizle', function () {
 t('guvenliUrl', function () {
   assert.strictEqual(H.guvenliUrl('javascript:alert(1)'), ''); assert.strictEqual(H.guvenliUrl('https://a.b'), 'https://a.b');
 });
-console.log(n + '/7 geçti');
+t('rsiSeri', function () {
+  var r = H.rsiSeri([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 14);
+  assert.strictEqual(r[13], null); assert.strictEqual(r[14], 100); assert.strictEqual(r.length, 16);
+  // Bilinen örnek (Wilder, 14): ilk RSI ~70.46
+  var k = [44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00];
+  var x = H.rsiSeri(k, 14); assert(Math.abs(x[14] - 70.46) < 0.1, x[14]); assert(x[15] < x[14]);
+});
+console.log(n + '/8 geçti');

@@ -71,8 +71,19 @@
     o.tf = o.tf && typeof o.tf === 'object' ? o.tf : {};
     return o;
   }
+  // Wilder RSI: kapanış listesi -> aynı uzunlukta liste (ilk n eleman null)
+  function rsiSeri(kapanis, n) {
+    var out = kapanis.map(function () { return null; }), g = 0, l = 0;
+    for (var i = 1; i < kapanis.length; i++) {
+      var d = kapanis[i] - kapanis[i - 1], up = d > 0 ? d : 0, dn = d < 0 ? -d : 0;
+      if (i <= n) { g += up; l += dn; if (i < n) continue; g /= n; l /= n; }
+      else { g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n; }
+      out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    }
+    return out;
+  }
   function guvenliUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? String(u) : ''; }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, planGecerli: planGecerli, planHesap: planHesap, girisDurumu: girisDurumu, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl };
+  var dis = { RISK_TAVAN: RISK_TAVAN, planGecerli: planGecerli, planHesap: planHesap, girisDurumu: girisDurumu, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);

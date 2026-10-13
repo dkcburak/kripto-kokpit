@@ -13,11 +13,24 @@
         .then(function () { hazir = true; OneSignal.Notifications.addEventListener('permissionChange', function () { window.dispatchEvent(new HashChangeEvent('hashchange')); }); });
     });
   }
+  // İnternetsiz açılış için önbellek: OneSignal'ın kullandığı aynı servis çalışanı dosyası (aynı kapsam)
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    var kapsam = location.pathname.replace(/[^/]*$/, '');
+    navigator.serviceWorker.getRegistration(kapsam).then(function (r) { if (!r) navigator.serviceWorker.register(kapsam + 'OneSignalSDKWorker.js', { scope: kapsam }).catch(function () {}); }).catch(function () {});
+  }
   window.KOKPIT_BILDIRIM = {
     durum: function () {
       if (!AYAR.onesignalAppId) return 'kurulmadi';
       if (!('Notification' in window) || (ios && !anaEkranda)) return 'desteklenmiyor';
       return Notification.permission === 'granted' ? 'acik' : 'kapali';
+    },
+    // Bu cihazın bildirim abonelik kimliği (eşlemede sunucuya gider: bildirimler yalnızca eşli cihazlara)
+    aboneId: function () {
+      if (!AYAR.onesignalAppId) return Promise.resolve('');
+      return new Promise(function (bitti) {
+        var zaman = setTimeout(function () { bitti(''); }, 4000);
+        OneSignalDeferred.push(function (OneSignal) { clearTimeout(zaman); bitti((OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.id) || ''); });
+      });
     },
     ac: function () {
       return new Promise(function (bitti) {
