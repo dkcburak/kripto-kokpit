@@ -317,3 +317,17 @@ details.piyasa[open]>summary::after{transform:rotate(225deg)}
 }
 details.piyasa>summary{flex-wrap:wrap;row-gap:4px}
 details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
+/* ---------- dKc v4: RSI, canlı fiyat, uygulamadan alarm ---------- */
+.rsi-kutu{position:relative;height:84px;margin-top:4px;border-top:1px solid var(--cizgi)}
+#rsiGrafik{position:absolute;inset:0}
+.rsi-et{position:absolute;left:4px;top:4px;z-index:3;font-size:11.5px;color:var(--sonuk);pointer-events:none}
+.rsi-et b{font-family:var(--f-sayi);font-weight:500;color:var(--yazi)} .rsi-et b.art{color:var(--long)} .rsi-et b.eks{color:var(--short)}
+.grafik-blok:fullscreen .rsi-kutu,.grafik-blok.tam-ekran .rsi-kutu{flex:none;height:110px}
+.alarm-blok{display:grid;gap:10px}
+.alarm-blok h2{margin:0}
+.alarm-blok .liste .satir:first-child{padding-top:0}
+.alarm-sil{grid-row:1/3;grid-column:3}
+.esleme{display:grid;gap:10px}
+.esleme .plan-not{margin:0}
+.poz-form .plan-not{margin:0}
+[data-cf],[data-cd]{transition:color .3s}
