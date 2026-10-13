@@ -16,7 +16,9 @@
   // İnternetsiz açılış için önbellek: OneSignal'ın kullandığı aynı servis çalışanı dosyası (aynı kapsam)
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     var kapsam = location.pathname.replace(/[^/]*$/, '');
-    navigator.serviceWorker.getRegistration(kapsam).then(function (r) { if (!r) navigator.serviceWorker.register(kapsam + 'OneSignalSDKWorker.js', { scope: kapsam }).catch(function () {}); }).catch(function () {});
+    navigator.serviceWorker.getRegistration(kapsam).then(function (r) { if (!r) navigator.serviceWorker.register(kapsam + 'OneSignalSDKWorker.js', { scope: kapsam }).catch(function () {}); else r.update().catch(function () {}); }).catch(function () {});
+    // Uygulama öne gelince yeni sürüm var mı diye bakılır
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) navigator.serviceWorker.getRegistration(kapsam).then(function (r) { if (r) r.update().catch(function () {}); }).catch(function () {}); });
   }
   window.KOKPIT_BILDIRIM = {
     durum: function () {
