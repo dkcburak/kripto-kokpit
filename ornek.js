@@ -55,16 +55,16 @@ window.KOKPIT_ORNEK = (function () {
 // Örnek mum üretici: aynı coin için hep aynı şekli verir.
 window.KOKPIT_ORNEK_MUM = function (coin, tf, fiyat) {
   var tohum = 0; for (var i = 0; i < coin.length; i++) tohum = (tohum * 31 + coin.charCodeAt(i)) % 9973;
-  tohum += tf === 'd' ? 1 : tf === 'h4' ? 2 : 3;
+  tohum += tf === 'd' ? 1 : tf === 'h4' ? 2 : tf === 'm15' ? 4 : 3;
   function rnd() { tohum = (tohum * 9301 + 49297) % 233280; return tohum / 233280; }
-  var adim = tf === 'd' ? 86400 : tf === 'h4' ? 14400 : 3600, n = 120, oyn = tf === 'd' ? 0.025 : tf === 'h4' ? 0.011 : 0.005;
+  var adim = tf === 'd' ? 86400 : tf === 'h4' ? 14400 : tf === 'm15' ? 900 : 3600, n = 120, oyn = tf === 'd' ? 0.025 : tf === 'h4' ? 0.011 : tf === 'm15' ? 0.0025 : 0.005;
   var simdi = Math.floor(Date.now() / 1000 / adim) * adim, p = fiyat * (0.93 + rnd() * 0.1), out = [];
   for (var k = 0; k < n; k++) {
     var hedef = fiyat, kalan = n - k;
     var o = p, c = o + (hedef - o) / Math.max(kalan, 8) + (rnd() - 0.5) * fiyat * oyn * 2;
     if (k === n - 1) c = fiyat;
     var h = Math.max(o, c) + rnd() * fiyat * oyn, l = Math.min(o, c) - rnd() * fiyat * oyn;
-    out.push({ time: simdi - (n - 1 - k) * adim, open: o, high: h, low: l, close: c }); p = c;
+    out.push({ time: simdi - (n - 1 - k) * adim, open: o, high: h, low: l, close: c, vol: Math.round(500 + rnd() * 1500) }); p = c;
   }
   return out;
 };
