@@ -13,7 +13,7 @@
     filtre: 'hepsi', ara: '', araAcik: false,
     tf: oku('dkc-tf', 'h1'), seviyeGoster: oku('dkc-seviye', null), grafik: null, form: '',
     favori: oku('dkc-favori', []), poz: oku('dkc-pozisyon', []), sermaye: oku('dkc-sermaye', null),
-    cihaz: oku('dkc-cihaz', ''), alarmForm: '', esleme: { adim: '', hata: '', mesgul: false }
+    cihaz: oku('dkc-cihaz', ''), pozEsit: '', alarmForm: '', esleme: { adim: '', hata: '', mesgul: false }
   };
   var CANLI = AYAR.api ? window.DKC_CANLI : null;
   var ADI = { long: 'Long hazırlığı', short: 'Short hazırlığı', bekle: 'Bekle', uzak: 'Uzak dur' };
@@ -336,7 +336,7 @@
       alan('kaldirac', 'Kaldıraç (x)', varsay.kaldirac) + alan('stop', 'Stop', varsay.stop) + alan('hedef', 'Hedef', varsay.hedef) + '</div>' +
       '<p class="form-hata" id="formHata" role="alert"></p>' +
       '<div class="form-dugmeler"><button class="dugme" type="submit">Kaydet</button><button class="dugme ikincil" type="button" data-form-iptal>Vazgeç</button></div>' +
-      '<p class="plan-not">Bilgiler yalnızca bu cihazda saklanır, MEXC’ye bağlanmaz.</p></form>';
+      '<p class="plan-not poz-not">' + esc(pozNot()) + '</p></form>';
   }
   function sayiOku(v) { v = String(v || '').trim().replace(/\s/g, ''); if (!v) return null; if (v.indexOf(',') >= 0) v = v.replace(/\./g, '').replace(',', '.'); var n = Number(v); return isFinite(n) && n > 0 ? n : NaN; }
   function pozKaydet(form) {
@@ -349,8 +349,58 @@
     else if (p.stop && (yon === 'long' ? p.stop >= p.giris : p.stop <= p.giris)) hata = yon === 'long' ? 'Long işlemde stop girişin altında olmalı.' : 'Short işlemde stop girişin üstünde olmalı.';
     else if (p.hedef && (yon === 'long' ? p.hedef <= p.giris : p.hedef >= p.giris)) hata = yon === 'long' ? 'Long işlemde hedef girişin üstünde olmalı.' : 'Short işlemde hedef girişin altında olmalı.';
     if (hata) { $('formHata').textContent = hata; return; }
-    durum.poz = durum.poz.filter(function (x) { return x.coin !== p.coin; }).concat([p]); yaz('dkc-pozisyon', durum.poz);
-    durum.form = ''; goster();
+    durum.poz = durum.poz.filter(function (x) { return x.coin !== p.coin; }).concat([p]);
+    durum.form = ''; goster(); pozDegisti({ tur: 'kaydet', p: p });
+  }
+
+  // ---------- İşlemlerim eşitleme: eşli cihazlarda aynı işlemler ----------
+  function pozNot() {
+    if (!AYAR.api || !durum.cihaz) return 'Bilgiler yalnızca bu cihazda saklanır, MEXC’ye bağlanmaz.' + (AYAR.api ? ' Diğer cihazlarınızda da görmek için bu cihazı eşleyin.' : '');
+    return 'Eşli cihazlarınızın hepsinde görünür (Google hesabınızdaki alarm motorunda saklanır), MEXC’ye bağlanmaz.' + (durum.pozEsit === 'hata' ? ' Son değişiklik gönderilemedi; bağlantı gelince tekrar denenir.' : '');
+  }
+  function pozNotYenile() { document.querySelectorAll('.poz-not').forEach(function (el) { el.textContent = pozNot(); }); }
+  // Değişiklikler sıraya yazılır ve tek tek gönderilir; internet yoksa sırada bekler, sonra gider.
+  var pozSurum = 0; // yoldaki eski sunucu cevabı yeni girişi ezmesin
+  function pozDegisti(islem) {
+    pozSurum++; yaz('dkc-pozisyon', durum.poz); yaz('dkc-sermaye', durum.sermaye);
+    if (!durum.cihaz || !AYAR.api) return;
+    yaz('dkc-poz-kuyruk', oku('dkc-poz-kuyruk', []).concat([islem]).slice(-50));
+    pozGonder();
+  }
+  function pozUygula(k) {
+    var once = JSON.stringify([durum.poz, durum.sermaye]);
+    durum.poz = Array.isArray(k.poz) ? k.poz : []; durum.sermaye = k.sermaye == null ? null : k.sermaye; durum.pozEsit = 'ok';
+    yaz('dkc-pozisyon', durum.poz); yaz('dkc-sermaye', durum.sermaye);
+    if (JSON.stringify([durum.poz, durum.sermaye]) !== once) pozEkranYenile(); else pozNotYenile();
+  }
+  var pozYolda = null;
+  function pozGonder() {
+    if (!durum.cihaz || !AYAR.api) return Promise.resolve();
+    if (pozYolda) return pozYolda.then(function () { if (oku('dkc-poz-kuyruk', []).length) return pozGonder(); });
+    var giden = oku('dkc-poz-kuyruk', []); if (!giden.length) return Promise.resolve();
+    var surum = pozSurum;
+    pozYolda = apiYaz({ f: 'pozIslem', t: durum.cihaz, islemler: giden }).then(function (k) {
+      yaz('dkc-poz-kuyruk', oku('dkc-poz-kuyruk', []).slice(giden.length));
+      if (surum === pozSurum) pozUygula(k);
+    }, function () { durum.pozEsit = 'hata'; pozNotYenile(); }).then(function () { pozYolda = null; });
+    return pozYolda;
+  }
+  function pozEkranYenile() {
+    pozNotYenile();
+    var yaziyor = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+    if (yaziyor || durum.form || !durum.veri) return;
+    if (/^#\/coin\//.test(location.hash) && $('grafik')) detayGuncelle(); else goster();
+  }
+  // Açılışta ve uygulama öne gelince çağrılır. Eşlemeden sonraki ilk seferde bu cihazdaki işlemler sunucudakilere eklenir.
+  function pozEsitle() {
+    if (!durum.cihaz || !AYAR.api) return Promise.resolve();
+    if (!oku('dkc-poz-aktarildi', false)) {
+      yaz('dkc-poz-kuyruk', [{ tur: 'birlestir', poz: durum.poz, sermaye: durum.sermaye }].concat(oku('dkc-poz-kuyruk', [])));
+      yaz('dkc-poz-aktarildi', true);
+    }
+    if (oku('dkc-poz-kuyruk', []).length) return pozGonder();
+    var surum = pozSurum;
+    return apiYaz({ f: 'pozGetir', t: durum.cihaz }).then(function (k) { if (surum === pozSurum && !pozYolda) pozUygula(k); }, function () { /* bağlantı yoksa kayıtlı kopyayla devam */ });
   }
 
   // ---------- Coin detayı: grafik önde ----------
@@ -408,29 +458,36 @@
       '<p class="form-hata" id="alarmHata" role="alert"></p>' +
       '<div class="form-dugmeler"><button class="dugme" type="submit">Alarmı kur</button><button class="dugme ikincil" type="button" data-alarm-iptal>Vazgeç</button></div></form>';
   }
-  function eslemeHtml() {
+  function eslemeHtml(iptal) {
     var e = durum.esleme;
-    return '<div class="esleme"><p class="plan-not">Bu cihazdan alarm kurmak için bir kez eşleme gerekir. Kod Telegram hesabınıza gelir; eşlenince bildirimler de yalnızca eşli cihazlarınıza gider.</p>' +
+    return '<div class="esleme"><p class="plan-not">Bu cihazı bir kez eşleyin; kod Telegram hesabınıza gelir. Eşlenince bu cihazdan alarm kurabilir, işlemlerinizi tüm eşli cihazlarınızda görürsünüz. Bildirimler de yalnızca eşli cihazlarınıza gider.</p>' +
       (e.adim === 'kod' ? '<form id="eslemeForm" class="poz-form"><label class="alan"><span>Telegram’a gelen 6 haneli kod</span><input name="kod" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>' +
         '<div class="form-dugmeler"><button class="dugme" type="submit"' + (e.mesgul ? ' disabled' : '') + '>' + (e.mesgul ? 'Bekleyin…' : 'Eşle') + '</button><button class="dugme ikincil" type="button" data-kod-iste>Yeni kod</button></div></form>'
-        : '<div class="form-dugmeler"><button class="dugme" data-kod-iste' + (e.mesgul ? ' disabled' : '') + '>' + (e.mesgul ? 'Gönderiliyor…' : 'Telegram’a kod gönder') + '</button><button class="dugme ikincil" data-alarm-iptal>Vazgeç</button></div>') +
+        : '<div class="form-dugmeler"><button class="dugme" data-kod-iste' + (e.mesgul ? ' disabled' : '') + '>' + (e.mesgul ? 'Gönderiliyor…' : 'Telegram’a kod gönder') + '</button>' + (iptal === false ? '' : '<button class="dugme ikincil" data-alarm-iptal>Vazgeç</button>') + '</div>') +
       '<p class="form-hata" id="eslemeHata" role="alert">' + esc(e.hata) + '</p></div>';
   }
   function alarmBlokYenile() { var c = coinBul(aktifCoin()); var b = document.querySelector('.alarm-blok'); if (c && b) b.outerHTML = alarmBlokHtml(c); }
+  function eslemeBlokHtml() { return '<section class="blok esleme-blok"><h2>Diğer cihazlarla eşitle</h2>' + eslemeHtml(false) + '</section>'; }
+  function eslemeYenile() {
+    alarmBlokYenile();
+    var eb = document.querySelector('.esleme-blok'); if (!eb) return;
+    if (durum.cihaz) goster(); else eb.outerHTML = eslemeBlokHtml();
+  }
   function kodIste() {
-    durum.esleme.mesgul = true; durum.esleme.hata = ''; alarmBlokYenile();
+    durum.esleme.mesgul = true; durum.esleme.hata = ''; eslemeYenile();
     apiYaz({ f: 'kodIste' }).then(function () { durum.esleme.adim = 'kod'; }, function (e) { durum.esleme.hata = e.message; if (/bekleyin/.test(e.message)) durum.esleme.adim = 'kod'; })
-      .then(function () { durum.esleme.mesgul = false; alarmBlokYenile(); var i = document.querySelector('#eslemeForm input'); if (i) i.focus(); });
+      .then(function () { durum.esleme.mesgul = false; eslemeYenile(); var i = document.querySelector('#eslemeForm input'); if (i) i.focus(); });
   }
   function eslestir(form) {
     var kod = form.kod.value.replace(/\D/g, '');
     if (kod.length !== 6) { $('eslemeHata').textContent = '6 haneli kodu yazın.'; return; }
-    durum.esleme.mesgul = true; alarmBlokYenile();
+    durum.esleme.mesgul = true; eslemeYenile();
     var abone = window.KOKPIT_BILDIRIM && window.KOKPIT_BILDIRIM.aboneId ? window.KOKPIT_BILDIRIM.aboneId() : Promise.resolve('');
     abone.then(function (id) { return apiYaz({ f: 'esles', kod: kod, abone: id || '' }); }).then(function (j) {
       durum.cihaz = j.t; yaz('dkc-cihaz', j.t); durum.esleme = { adim: '', hata: '', mesgul: false };
+      yaz('dkc-poz-aktarildi', false); yaz('dkc-poz-kuyruk', []); pozEsitle();
     }, function (e) { durum.esleme.mesgul = false; durum.esleme.hata = e.message; if (/süresi doldu|Çok fazla/.test(e.message)) durum.esleme.adim = ''; })
-      .then(alarmBlokYenile);
+      .then(eslemeYenile);
   }
   function alarmKur(form) {
     var c = coinBul(form.dataset.coin), sv = sayiOku(form.seviye.value), hata = $('alarmHata');
@@ -495,7 +552,7 @@
         var c = coinBul(p.coin) || { coin: p.coin, fiyat: null };
         return '<div>' + pozKartHtml(c, p, true) + '<button class="dugme ikincil kucuk poz-sil" data-poz-sil="' + esc(p.coin) + '">Kapattım, listeden çıkar</button></div>';
       }).join('') + '</div>' : '<p class="bos">Açık işlem yok. Bir coinin sayfasında “İşleme girdim”e basarak ekleyin.</p>') +
-      '<p class="plan-not">Bilgiler yalnızca bu cihazda saklanır; MEXC hesabınıza bağlanmaz.</p></section>';
+      '<p class="plan-not poz-not">' + esc(pozNot()) + '</p></section>' + (AYAR.api && !durum.cihaz ? eslemeBlokHtml() : '');
   }
 
   // ---------- Alarmlar ----------
@@ -697,6 +754,7 @@
     }
   }
   function yenile() {
+    pozEsitle();
     return ozetYukle().then(function () {
       if (/^#\/coin\//.test(location.hash) && $('grafik')) { tazelikGuncelle(); yanGuncelle(); detayGuncelle(); }
       else if (durum.form) tazelikGuncelle();
@@ -721,7 +779,7 @@
     if (t.closest('[data-alarm-iptal]')) { durum.alarmForm = ''; durum.esleme = { adim: '', hata: '', mesgul: false }; alarmBlokYenile(); return; }
     if (t.closest('[data-kod-iste]')) { e.preventDefault(); kodIste(); return; }
     var as = t.closest('[data-alarm-sil]'); if (as) { alarmSil(as.dataset.alarmSil, as); return; }
-    var sil = t.closest('[data-poz-sil]'); if (sil) { e.preventDefault(); var sc = sil.dataset.pozSil; if (!window.confirm(sc + ' işlemini listeden çıkarmak istiyor musunuz?')) return; durum.poz = durum.poz.filter(function (x) { return x.coin !== sc; }); yaz('dkc-pozisyon', durum.poz); goster(); return; }
+    var sil = t.closest('[data-poz-sil]'); if (sil) { e.preventDefault(); var sc = sil.dataset.pozSil; if (!window.confirm(sc + ' işlemini listeden çıkarmak istiyor musunuz?')) return; durum.poz = durum.poz.filter(function (x) { return x.coin !== sc; }); goster(); pozDegisti({ tur: 'sil', coin: sc }); return; }
     var satir = t.closest('tr[data-git]'); if (satir && !t.closest('a')) { location.hash = satir.dataset.git; return; }
     if (t.closest('#bildirimAc') && window.KOKPIT_BILDIRIM) { window.KOKPIT_BILDIRIM.ac().then(goster); }
   });
@@ -731,7 +789,7 @@
     else if (e.target.id === 'eslemeForm') { e.preventDefault(); eslestir(e.target); }
   });
   document.addEventListener('change', function (e) {
-    if (e.target.id === 'sermaye') { var n = sayiOku(e.target.value); durum.sermaye = n && !isNaN(n) ? n : null; yaz('dkc-sermaye', durum.sermaye); goster(); }
+    if (e.target.id === 'sermaye') { var n = sayiOku(e.target.value); durum.sermaye = n && !isNaN(n) ? n : null; goster(); pozDegisti({ tur: 'sermaye', deger: durum.sermaye }); }
   });
   document.addEventListener('input', function (e) {
     if (e.target.name === 'seviye' && e.target.form && e.target.form.id === 'alarmForm') { var ac = coinBul(e.target.form.dataset.coin); if (ac) $('alarmYon').textContent = alarmYonYazi(ac, sayiOku(e.target.value)); return; }
@@ -745,7 +803,7 @@
   window.addEventListener('hashchange', function () { durum.form = ''; durum.alarmForm = ''; durum.esleme = { adim: '', hata: '', mesgul: false }; if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); goster(); window.scrollTo(0, 0); });
   MASA.addEventListener('change', function () { $('yan').innerHTML = ''; goster(); });
   // Uygulama öne gelince ya da internet dönünce hemen yenile
-  document.addEventListener('visibilitychange', function () { if (!document.hidden && AYAR.api && Date.now() - durum.sonBasari > 30000) yenile(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden || !AYAR.api) return; if (Date.now() - durum.sonBasari > 30000) yenile(); else pozEsitle(); });
   window.addEventListener('online', function () { yenile(); });
   window.addEventListener('offline', tazelikGuncelle);
 
