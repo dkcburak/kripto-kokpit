@@ -6,6 +6,8 @@ Burak Bey'in coin takip uygulaması; ekranda adı **dKc**. Repo ve adres `kripto
 - **Veri:** Apps Script "Kripto Alarm Motoru" `doGet` (`?k=ANAHTAR&f=ozet` ve `&f=mum&coin=SOL&tf=h4`). Kod: `/mnt/project-files/kripto/alarm-motoru/Kod.gs`.
 - **Analiz:** Claude rutinleri 08:00/19:30 `kokpit-analiz-*.json` yazar (bkz. `ANALIZ-FORMATI.md`, kontrol: `analiz-kontrol.js`).
 - **Bildirim:** OneSignal web push (`bildirim.js`, `OneSignalSDKWorker.js`). Apps Script alarm çalınca OneSignal REST API'ye gönderir (`ONESIGNAL_KEY`, `ONESIGNAL_APP_ID` Script Properties'te).
+- **Girişe uygun (trafik ışığı):** `hesap.js` `karar()`. Yeşil: analiz plan yönünde hazır, 1G/4S ters değil, 1S onaylı, ters yönde "Yüksek" haber yok (long'da piyasa "Riskten kaçış" değil) ve fiyat giriş bölgesinde. Sarı: plan var, eksik koşul yazılır. Kırmızı: plan yok, geçersiz ya da stop geçildi. Emir değildir.
+- **Grafik hızı:** mumlar cihazda saklanır (en fazla 30), grafik anında açılır, arkada yenilenir; ana ekranda önceden yüklenir.
 - **Ayar:** `ayar.js`; `api` boşsa uygulama örnek veriyle (`ornek.js`) açılır.
 
 ## Yayına alma adımları
