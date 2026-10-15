@@ -2,8 +2,8 @@ importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 // dKc: internetsiz açılış. Önce ağ (güncel sürüm hep gelir), ağ yoksa son kaydedilen kopya.
 // Yalnızca bu sitenin dosyaları; veri servisi ve MEXC istekleri önbelleğe alınmaz.
-var DKC_ONBELLEK = 'dkc-kabuk-v6';
-var DKC_DOSYALAR = ['./', 'index.html', 'app.css?v=6', 'app.js?v=6', 'hesap.js?v=6', 'canli.js?v=6', 'bildirim.js?v=6', 'ornek.js?v=6', 'ayar.js',
+var DKC_ONBELLEK = 'dkc-kabuk-v7';
+var DKC_DOSYALAR = ['./', 'index.html', 'app.css?v=7', 'app.js?v=7', 'hesap.js?v=7', 'canli.js?v=7', 'bildirim.js?v=7', 'ornek.js?v=7', 'ayar.js',
   'lib/lightweight-charts-4.2.0.js', 'manifest.webmanifest', 'ikon.svg', 'ikon-180.png', 'ikon-192.png'];
 
 self.addEventListener('install', function (e) {

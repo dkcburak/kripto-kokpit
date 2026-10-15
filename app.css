@@ -331,3 +331,32 @@ details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
 .esleme .plan-not{margin:0}
 .poz-form .plan-not{margin:0}
 [data-cf],[data-cd]{transition:color .3s}
+
+/* ---------- Trafik ışığı: girişe uygun / bekle / uzak dur ---------- */
+.d-yesil{color:var(--long);background:color-mix(in srgb,var(--long) 15%,transparent)}
+.d-sari{color:var(--bekle);background:color-mix(in srgb,var(--bekle) 15%,transparent)}
+.d-kirmizi{color:var(--short);background:color-mix(in srgb,var(--short) 14%,transparent)}
+.d-islem{color:var(--mavi);background:color-mix(in srgb,var(--mavi) 15%,transparent)}
+.grup h2 .g-isik{width:9px;height:9px;padding:0;border-radius:50%;flex:none}
+.cs-ad .durum{font:600 11px var(--f-metin);padding:2px 8px;margin-left:2px}
+.cs-orta .yakinlik{display:block;flex:none;width:min(150px,70%);margin-top:6px}
+.plan-kart .yakinlik{display:block;flex:none;margin-top:8px}
+.karar{display:grid;gap:10px}
+.karar-yesil{border-color:color-mix(in srgb,var(--long) 55%,var(--cizgi));background:linear-gradient(180deg,color-mix(in srgb,var(--long) 9%,var(--yuzey)),var(--yuzey))}
+.karar-sari{border-color:color-mix(in srgb,var(--bekle) 45%,var(--cizgi));background:linear-gradient(180deg,color-mix(in srgb,var(--bekle) 7%,var(--yuzey)),var(--yuzey))}
+.karar-kirmizi{border-color:color-mix(in srgb,var(--short) 40%,var(--cizgi))}
+.karar-ust{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.karar-ust .durum{font-size:15px;padding:6px 14px}
+.karar-ust .durum::before{width:9px;height:9px}
+.karar-yon{font-weight:600;font-size:14px}
+.kosullar{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.kosullar li{display:grid;grid-template-columns:22px 58px minmax(0,1fr);align-items:baseline;gap:6px;font-size:13.5px}
+.kosullar li span:last-child{color:var(--sonuk)}
+.k-isaret{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;align-self:center}
+.k-tamam .k-isaret{color:var(--long);background:color-mix(in srgb,var(--long) 18%,transparent)}
+.k-eksik .k-isaret{color:var(--bekle);background:color-mix(in srgb,var(--bekle) 18%,transparent)}
+.karar-risk{margin:0;font-size:13.5px;padding-top:8px;border-top:1px solid var(--cizgi)}
+.karar-neden{margin:0;font-size:14px;font-weight:600;color:var(--sonuk)}
+.karar-ozet{margin:0;font-size:14px}
+.karar .zd{margin:0}
+.karar-not{margin:0;font-size:11.5px;color:var(--soluk)}

@@ -34,6 +34,40 @@
     return { tur: 'gecti', stopa: stopa };
   }
 
+  // Giriş kararı (trafik ışığı). Emir değildir; planın koşul durumunu söyler.
+  // yesil: teknik + temel + fiyat bölgede tamam. sari: plan var, bir koşul eksik. kirmizi: plan yok/geçersiz.
+  var TERS = { long: 'asagi', short: 'yukari' }, AYNI = { long: 'yukari', short: 'asagi' };
+  function karar(c, piyasa) {
+    var p = c && c.plan, o = { renk: 'kirmizi', ad: 'Uzak dur', eksik: [], teknik: false, temel: false, fiyat: false, g: null };
+    if (!c) return o;
+    if (c.planHatali) { o.neden = 'Plan verisi hatalı'; return o; }
+    if (!p) { o.neden = c.durum === 'uzak' ? 'Analiz: uzak dur' : 'İşlem planı yok'; return o; }
+    var yon = p.yon === 'short' ? 'short' : 'long', tf = c.tf || {}, g = girisDurumu(p, c.fiyat);
+    o.yon = yon; o.g = g;
+    if (c.durum === 'uzak') { o.neden = 'Analiz: uzak dur'; return o; }
+    if (g && g.tur === 'gecti' && (yon === 'short' ? c.fiyat >= p.stop : c.fiyat <= p.stop)) { o.neden = 'Fiyat stopun ötesinde · plan geçersiz'; return o; }
+    // Teknik
+    var tek = [];
+    if (c.durum !== yon) tek.push('analiz onayı yok');
+    if (tf.d === TERS[yon]) tek.push('1G ters yönde');
+    if (tf.h4 === TERS[yon]) tek.push('4S ters yönde');
+    if (tf.h1 !== 'onay' && tf.h1 !== AYNI[yon]) tek.push('1S onayı yok');
+    // Temel
+    var tem = [], tersHaber = yon === 'long' ? 'Olumsuz' : 'Olumlu';
+    (c.haberler || []).forEach(function (h) { if (h && h.etki === 'Yüksek' && h.yon === tersHaber && tem.indexOf('ters yönde önemli haber') < 0) tem.push('ters yönde önemli haber'); });
+    if (yon === 'long' && piyasa && piyasa.mod === 'Riskten kaçış') tem.push('piyasa riskten kaçışta');
+    // Fiyat
+    var fiy = [];
+    if (!g) fiy.push('fiyat yok');
+    else if (g.tur === 'uzak') fiy.push('girişe %' + (Math.round(g.girise * 10) / 10).toString().replace('.', ',') + ' kaldı');
+    else if (g.tur === 'gecti') fiy.push('fiyat bölgenin ' + (yon === 'short' ? 'üstünde' : 'altında'));
+    o.teknik = !tek.length; o.temel = !tem.length; o.fiyat = !fiy.length;
+    o.eksik = fiy.concat(tek, tem);
+    if (!o.eksik.length) { o.renk = 'yesil'; o.ad = 'Girişe uygun'; }
+    else { o.renk = 'sari'; o.ad = 'Bekle'; }
+    return o;
+  }
+
   // Elle girilen pozisyon: kâr/zarar, stopa/hedefe uzaklık, risk, yaklaşık likidasyon (izole, bakım marjı ~%0,5)
   function pozisyonHesap(poz, fiyat, sermaye) {
     var yon = poz.yon === 'short' ? -1 : 1, deg = sayi(fiyat) ? (fiyat - poz.giris) / poz.giris * yon : 0;
@@ -84,6 +118,6 @@
   }
   function guvenliUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? String(u) : ''; }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, planGecerli: planGecerli, planHesap: planHesap, girisDurumu: girisDurumu, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri };
+  var dis = { RISK_TAVAN: RISK_TAVAN, planGecerli: planGecerli, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);

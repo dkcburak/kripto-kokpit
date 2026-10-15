@@ -54,4 +54,28 @@ t('rsiSeri', function () {
   var k = [44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00];
   var x = H.rsiSeri(k, 14); assert(Math.abs(x[14] - 70.46) < 0.1, x[14]); assert(x[15] < x[14]);
 });
-console.log(n + '/8 geçti');
+t('karar', function () {
+  var tamam = { coin: 'X', durum: 'long', plan: L, fiyat: 105, tf: { d: 'yukari', h4: 'yatay', h1: 'onay' }, haberler: [] };
+  var k = H.karar(tamam, { mod: 'Temkinli' }); assert.strictEqual(k.renk, 'yesil'); assert.strictEqual(k.ad, 'Girişe uygun');
+  // 1S onayı yok -> sarı
+  k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yatay', h1: 'yok' } })); assert.strictEqual(k.renk, 'sari'); assert(k.eksik.indexOf('1S onayı yok') >= 0); assert(!k.teknik && k.temel && k.fiyat);
+  // 4S ters
+  k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } })); assert.strictEqual(k.renk, 'sari');
+  // ters yüksek haber, aynı yöndeki haber sorun değil
+  k = H.karar(Object.assign({}, tamam, { haberler: [{ etki: 'Yüksek', yon: 'Olumsuz' }] })); assert.strictEqual(k.renk, 'sari'); assert(!k.temel);
+  assert.strictEqual(H.karar(Object.assign({}, tamam, { haberler: [{ etki: 'Yüksek', yon: 'Olumlu' }, { etki: 'Orta', yon: 'Olumsuz' }] })).renk, 'yesil');
+  // piyasa riskten kaçış long'u durdurur
+  assert.strictEqual(H.karar(tamam, { mod: 'Riskten kaçış' }).renk, 'sari');
+  // fiyat bölgede değil
+  k = H.karar(Object.assign({}, tamam, { fiyat: 120 })); assert.strictEqual(k.renk, 'sari'); assert(/girişe %/.test(k.eksik[0]));
+  // analiz bekle diyorsa yeşil olmaz
+  assert.strictEqual(H.karar(Object.assign({}, tamam, { durum: 'bekle' })).renk, 'sari');
+  // stop geçildi -> kırmızı; plan yok -> kırmızı; uzak -> kırmızı
+  assert.strictEqual(H.karar(Object.assign({}, tamam, { fiyat: 94 })).renk, 'kirmizi');
+  assert.strictEqual(H.karar({ coin: 'Y', durum: 'bekle', plan: null }).renk, 'kirmizi');
+  assert.strictEqual(H.karar(Object.assign({}, tamam, { durum: 'uzak' })).renk, 'kirmizi');
+  // short
+  var ks = H.karar({ coin: 'Z', durum: 'short', plan: S, fiyat: 105, tf: { d: 'asagi', h4: 'asagi', h1: 'asagi' }, haberler: [{ etki: 'Yüksek', yon: 'Olumsuz' }] }, { mod: 'Riskten kaçış' });
+  assert.strictEqual(ks.renk, 'yesil');
+});
+console.log(n + '/9 geçti');
