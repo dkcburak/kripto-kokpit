@@ -482,6 +482,43 @@
     return '<section class="blok karar karar-' + k.renk + '"><h2 class="karar-baslik">Koşullar</h2>' + govde + (c.ozet ? '<p class="karar-ozet">' + esc(c.ozet) + '</p>' : '') + tfSatir(c.tf) + plan +
       '<p class="karar-not">Emir değildir; analiz planının koşul durumunu gösterir. Kararı siz verirsiniz. Analiz: ' + esc(durum.veri.analizZamani || '–') + '.</p></section>';
   }
+  // ---------- Türev verisi (Binance açık verisi, doğrudan telefondan) ----------
+  var turev = {}, TUREV_SURE = 5 * 60000;
+  function turevYukle(coin) {
+    var k = turev[coin];
+    if (k && (k.yolda || Date.now() - k.t < TUREV_SURE)) return;
+    turev[coin] = { yolda: true, t: k ? k.t : 0, v: k && k.v, hata: k && k.hata };
+    var s = H.binanceSembol(coin), b = 'https://fapi.binance.com';
+    var al = function (u) {
+      var ctrl = window.AbortController ? new AbortController() : null, z = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
+      return fetch(b + u, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { clearTimeout(z); if (r.status === 400) throw new Error('yok'); if (!r.ok) throw new Error('Binance ' + r.status); return r.json(); });
+    };
+    Promise.all([al('/futures/data/openInterestHist?symbol=' + s + '&period=1h&limit=25'), al('/futures/data/globalLongShortAccountRatio?symbol=' + s + '&period=1h&limit=1'), al('/fapi/v1/premiumIndex?symbol=' + s)])
+      .then(function (x) { var c = coinBul(coin); turev[coin] = { t: Date.now(), x: x, v: H.turevHesap(x[0], x[1], x[2], c && c.deg24) }; if (!turev[coin].v) turev[coin].hata = 'Veri yok'; },
+        function (e) { turev[coin] = { t: Date.now(), hata: e && e.message === 'yok' ? 'Bu coin Binance vadelide yok.' : navigator.onLine === false ? 'İnternet yok.' : 'Binance verisi alınamadı.' }; })
+      .then(function () { var bl = $('turevBlok'), c = coinBul(coin); if (bl && c && aktifCoin() === coin) bl.outerHTML = turevHtml(c); });
+  }
+  function dolar(x) { return x >= 1e9 ? f(x / 1e9, 2) + ' milyar $' : x >= 1e6 ? f(x / 1e6, 1) + ' milyon $' : f(x, 0) + ' $'; }
+  function cizgiSvg(seri, renk) {
+    var lo = Math.min.apply(null, seri), hi = Math.max.apply(null, seri), ara = hi - lo || 1, w = 120, h = 30;
+    return '<svg class="kucuk-cizgi" viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true"><polyline fill="none" stroke="' + renk + '" stroke-width="1.6" stroke-linejoin="round" points="' +
+      seri.map(function (v, i) { return (i / (seri.length - 1) * w).toFixed(1) + ',' + (h - 2 - (v - lo) / ara * (h - 4)).toFixed(1); }).join(' ') + '"/></svg>';
+  }
+  function turevHtml(c) {
+    var k = turev[c.coin], d = k && k.v, ic;
+    if (!k || (k.yolda && !d && !k.hata)) ic = '<p class="plan-not" style="margin:0">Yükleniyor…</p>';
+    else if (!d) ic = '<p class="plan-not" style="margin:0">' + esc(k.hata || 'Veri yok') + '</p>';
+    else {
+      var oiRenk = d.oiDeg24 >= 0 ? 'var(--long)' : 'var(--short)';
+      ic = '<div class="turev-ust"><div><span class="sk-et">Açık pozisyon (OI)</span><b class="sayi">' + dolar(d.oi) + '</b><small class="sayi ' + (d.oiDeg24 >= 0 ? 'art' : 'eks') + '">24s ' + degisim(d.oiDeg24) + '</small></div>' + cizgiSvg(d.seri, oiRenk) + '</div>' +
+        '<dl class="plan">' +
+        (d.ls != null ? '<dt>Long / short hesap oranı</dt><dd class="sayi">' + f(d.ls, 2) + ' <span class="soluk-yazi">(long %' + f(d.longYuzde, 0) + ')</span></dd>' : '') +
+        (d.funding != null ? '<dt>Funding (Binance · MEXC)</dt><dd class="sayi">%' + f(d.funding * 100, 4) + (c.funding != null ? ' · %' + f(c.funding * 100, 4) : '') + '</dd>' : '') + '</dl>' +
+        '<ul class="okuma">' + d.okuma.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+    }
+    return '<section class="blok turev" id="turevBlok"><h2>Türev verisi</h2>' + ic +
+      '<p class="karar-not">Kaynak: Binance vadeli, ' + (k && k.t ? saat(k.t) : '–') + '. MEXC’teki pozisyonları göstermez; bilgi amaçlıdır, “Girişe uygun” kararına girmez.</p></section>';
+  }
   // Ana düğme duruma göre: girişe uygunsa "İşleme girdim", beklerken giriş alarmı bilgisi
   function eylemHtml(c) {
     var k = kararBul(c), girdim = function (ana) { return '<button class="dugme genis' + (ana ? '' : ' ikincil') + '" data-form-ac>İşleme girdim</button>'; };
@@ -497,7 +534,8 @@
     var poz = durum.form === c.coin ? pozFormHtml(c) :
       p ? '<section class="blok poz-blok"><div class="blok-ust"><h2>Pozisyonum</h2><span class="dugme-grup"><button class="dugme ikincil kucuk" data-form-ac>Düzenle</button><button class="dugme ikincil kucuk" data-poz-sil="' + esc(c.coin) + '">Kapattım</button></span></div>' + pozKartHtml(c, p, false) + '</section>' :
       eylemHtml(c);
-    return kararKartHtml(c) + poz + alarmBlokHtml(c) +
+    turevYukle(c.coin);
+    return kararKartHtml(c) + poz + turevHtml(c) + alarmBlokHtml(c) +
       '<section class="blok"><h2>Haberler</h2>' + (c.haberler.length ? c.haberler.slice(0, 3).map(function (h) { return haberSatir(h); }).join('') : '<p class="bos">Son 24 saatte önemli haber yok.</p>') + '</section>';
   }
   // ---------- Uygulamadan fiyat alarmı ----------

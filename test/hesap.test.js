@@ -115,4 +115,13 @@ t('toplamRisk yön başına', function () {
   var p = [{ coin: 'A', yon: 'long', giris: 100, buyukluk: 1000, stop: 96 }, { coin: 'B', yon: 'short', giris: 10, buyukluk: 1000, stop: 10.4 }];
   var r = H.toplamRisk(p, { A: 100, B: 10 }, 1000); assert(Math.abs(r.yuzde - 8) < 1e-9); assert(!r.asildi); assert(Math.abs(r.yonler.short - 4) < 1e-9);
 });
+t('turevHesap', function () {
+  var oi = [{ sumOpenInterestValue: '100' }, { sumOpenInterestValue: '110' }];
+  var d = H.turevHesap(oi, [{ longShortRatio: '3' }], { lastFundingRate: '0.0001' }, -2);
+  assert(Math.abs(d.oiDeg24 - 10) < 1e-9); assert.strictEqual(d.longYuzde, 75); assert(/yeni short/.test(d.okuma[0])); assert(/kalabalık taraf long/.test(d.okuma[1]));
+  assert(/yeni long/.test(H.turevHesap(oi, [], {}, 3).okuma[0]));
+  assert(/yatay/.test(H.turevHesap([{ sumOpenInterestValue: '100' }, { sumOpenInterestValue: '101' }], null, null, 5).okuma[0]));
+  assert.strictEqual(H.turevHesap([], null, null, 0), null);
+  assert.strictEqual(H.binanceSembol('PEPE'), '1000PEPEUSDT'); assert.strictEqual(H.binanceSembol('SOL'), 'SOLUSDT');
+});
 console.log(n + ' test geçti');
