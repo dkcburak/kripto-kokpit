@@ -493,8 +493,14 @@
       var ctrl = window.AbortController ? new AbortController() : null, z = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
       return fetch(b + u, ctrl ? { signal: ctrl.signal } : {}).then(function (r) { clearTimeout(z); if (r.status === 400) throw new Error('yok'); if (!r.ok) throw new Error('Binance ' + r.status); return r.json(); });
     };
-    Promise.all([al('/futures/data/openInterestHist?symbol=' + s + '&period=1h&limit=25'), al('/futures/data/globalLongShortAccountRatio?symbol=' + s + '&period=1h&limit=1'), al('/fapi/v1/premiumIndex?symbol=' + s)])
-      .then(function (x) { var c = coinBul(coin); turev[coin] = { t: Date.now(), x: x, v: H.turevHesap(x[0], x[1], x[2], c && c.deg24) }; if (!turev[coin].v) turev[coin].hata = 'Veri yok'; },
+    // 7 günlük saatlik açık pozisyon, long/short oranı ve mumlar: son 24 saat türev özeti, tamamı tahmini likidasyon için
+    Promise.all([al('/futures/data/openInterestHist?symbol=' + s + '&period=1h&limit=168'), al('/futures/data/globalLongShortAccountRatio?symbol=' + s + '&period=1h&limit=168'), al('/fapi/v1/premiumIndex?symbol=' + s), al('/fapi/v1/klines?symbol=' + s + '&interval=1h&limit=168')])
+      .then(function (x) {
+        var c = coinBul(coin);
+        turev[coin] = { t: Date.now(), v: H.turevHesap(x[0].slice(-25), x[1].slice(-1), x[2], c && c.deg24), lik: H.likidasyonHesap(x[0], x[3], x[1], c && c.fiyat) };
+        if (!turev[coin].v) turev[coin].hata = 'Veri yok';
+        var g = durum.grafik; if (g && g.coin === coin && g.liqKatman && g.liqKatman.istek) g.liqKatman.istek();
+      },
         function (e) { turev[coin] = { t: Date.now(), hata: e && e.message === 'yok' ? 'Bu coin Binance vadelide yok.' : navigator.onLine === false ? 'İnternet yok.' : 'Binance verisi alınamadı.' }; })
       .then(function () { var bl = $('turevBlok'), c = coinBul(coin); if (bl && c && aktifCoin() === coin) bl.outerHTML = turevHtml(c); });
   }
@@ -513,11 +519,27 @@
       ic = '<div class="turev-ust"><div><span class="sk-et">Açık pozisyon (OI)</span><b class="sayi">' + dolar(d.oi) + '</b><small class="sayi ' + (d.oiDeg24 >= 0 ? 'art' : 'eks') + '">24s ' + degisim(d.oiDeg24) + '</small></div>' + cizgiSvg(d.seri, oiRenk) + '</div>' +
         '<dl class="plan">' +
         (d.ls != null ? '<dt>Long / short hesap oranı</dt><dd class="sayi">' + f(d.ls, 2) + ' <span class="soluk-yazi">(long %' + f(d.longYuzde, 0) + ')</span></dd>' : '') +
-        (d.funding != null ? '<dt>Funding (Binance · MEXC)</dt><dd class="sayi">%' + f(d.funding * 100, 4) + (c.funding != null ? ' · %' + f(c.funding * 100, 4) : '') + '</dd>' : '') + '</dl>' +
-        '<ul class="okuma">' + d.okuma.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+        (d.funding != null ? '<dt>Funding (Binance · MEXC)</dt><dd class="sayi">%' + f(d.funding * 100, 4) + (c.funding != null ? ' · %' + f(c.funding * 100, 4) : '') + '</dd>' : '') +
+        likSatir(k.lik) + '</dl>' +
+        '<ul class="okuma">' + d.okuma.concat(likOkuma(c, k.lik)).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
     }
     return '<section class="blok turev" id="turevBlok"><h2>Türev verisi</h2>' + ic +
-      '<p class="karar-not">Kaynak: Binance vadeli, ' + (k && k.t ? saat(k.t) : '–') + '. MEXC’teki pozisyonları göstermez; bilgi amaçlıdır, “Girişe uygun” kararına girmez.</p></section>';
+      '<p class="karar-not">Kaynak: Binance vadeli, ' + (k && k.t ? saat(k.t) : '–') + '. MEXC’teki pozisyonları göstermez. Likidasyon kümeleri son 7 günün açık pozisyon artışından tahmindir, kesin değildir. Hepsi bilgi amaçlıdır, “Girişe uygun” kararına girmez.</p></section>';
+  }
+  // Tahmini likidasyon: en yoğun küme üstte (short likidasyonu) ve altta (long likidasyonu)
+  function likSatir(l) {
+    if (!l || (!l.ust && !l.alt)) return '';
+    var y = function (e) { return e ? f(e.p) + ' <span class="soluk-yazi">(' + (e.uzak >= 0 ? '+' : '−') + '%' + f(Math.abs(e.uzak), 1) + ')</span>' : '–'; };
+    return '<dt>Tahmini likidasyon kümesi</dt><dd class="sayi">▲ ' + y(l.ust) + '<br>▼ ' + y(l.alt) + '</dd>';
+  }
+  // Stop bir kümenin hemen önündeyse not düşer (karar değişmez)
+  function likOkuma(c, l) {
+    var p = c.plan; if (!l || !p || !p.stop) return [];
+    var lng = p.yon !== 'short', e = lng ? l.alt : l.ust; if (!e) return [];
+    var fark = Math.abs(p.stop / e.p - 1) * 100;
+    if (fark > 1) return [];
+    var once = lng ? p.stop > e.p : p.stop < e.p;
+    return [once ? 'Plan stopu tahmini bir likidasyon kümesinin hemen önünde: iğne stopu alıp dönebilir, kümenin ötesi daha güvenli olabilir.' : 'Plan stopu tahmini likidasyon kümesinin ötesinde.'];
   }
   // Ana düğme duruma göre: girişe uygunsa "İşleme girdim", beklerken giriş alarmı bilgisi
   function eylemHtml(c) {
@@ -645,13 +667,14 @@
       '<div class="detay"><section class="blok grafik-blok"><div class="grafik-ust"><div class="sekmeler" role="group" aria-label="Zaman dilimi">' +
       TF.map(function (t) { return '<button data-tf="' + t[0] + '" aria-pressed="' + (durum.tf === t[0]) + '" aria-label="' + t[2] + '">' + t[1] + '</button>'; }).join('') +
       '</div><div class="grafik-arac"><button class="tam-dugme" id="tamEkran" title="Tam ekran (F)">' + TAM_IKON + '<span>Tam ekran</span></button></div></div>' +
-      '<div class="katmanlar" role="group" aria-label="Grafik katmanları">' + cip('plan', 'Plan') + cip('seviye', 'Seviyeler') + cip('gosterge', 'RSI · Hacim') + '</div>' +
+      '<div class="katmanlar" role="group" aria-label="Grafik katmanları">' + cip('plan', 'Plan') + cip('seviye', 'Seviyeler') + cip('gosterge', 'RSI · Hacim') + cip('likidasyon', 'Likidasyon') + '</div>' +
       '<span class="tam-baslik">' + esc(c.coin) + ' <span class="sayi"' + cf(c) + '>' + f(c.fiyat) + '</span></span>' +
       '<div id="grafik" role="img" aria-label="' + esc(c.coin) + ' mum grafiği"></div>' +
       (gos ? '<div class="rsi-kutu"><span class="rsi-et">RSI 14 <b id="rsiDeger">–</b></span><div id="rsiGrafik" aria-hidden="true"></div></div>' : '') +
       '<div class="lejant">' + (pozBul(c.coin) ? '<span><i style="background:var(--mavi)"></i>Girişim</span>' : '') +
       (plan ? '<span><i class="kare" style="background:' + yr + '"></i>Giriş bölgesi</span><span><i class="kare" style="background:var(--short)"></i>Stop alanı</span><span><i class="kare" style="background:var(--long)"></i>Hedef alanı</span>' : '') +
-      (seviye ? '<span><i class="kare" style="background:var(--gri-bant)"></i>Destek / direnç</span><span>▾▴ Tepe / dip</span>' : '') + '<span><i style="background:var(--ema)"></i>EMA50</span><span class="lejant-saat">Türkiye saati</span></div></section>' +
+      (seviye ? '<span><i class="kare" style="background:var(--gri-bant)"></i>Destek / direnç</span><span>▾▴ Tepe / dip</span>' : '') +
+      (katman('likidasyon') ? '<span><i class="kare" style="background:var(--liq)"></i>Tahmini likidasyon (Binance)</span>' : '') + '<span><i style="background:var(--ema)"></i>EMA50</span><span class="lejant-saat">Türkiye saati</span></div></section>' +
       '<div class="detay-sag" id="detaySag">' + detaySagHtml(c) + '</div></div>' +
       '<p class="uyari">Yatırım tavsiyesi değildir. Seviyeler ' + esc(durum.veri.analizZamani || '') + ' analizinden. Kazanç/risk ücret payı dahil, funding hariçtir.</p>';
   }
@@ -731,6 +754,7 @@
     this.gorunum = [gor('bottom', alt)]; if (ust) this.gorunum.push(gor('top', ust));
   }
   Katman.prototype.paneViews = function () { return this.gorunum; };
+  Katman.prototype.attached = function (p) { this.istek = p.requestUpdate; };
   Katman.prototype.updateAllViews = function () {};
   function yaziCiz(ctx, metin, x, y, renk, sag) {
     ctx.font = '600 11px IBM Plex Sans, system-ui, sans-serif'; ctx.textBaseline = 'middle';
@@ -755,7 +779,7 @@
     var kutu = $('grafik'); if (!kutu || !window.LightweightCharts) return;
     grafikKaldir(); kutu.innerHTML = '';
     var css = getComputedStyle(document.documentElement), r = function (n) { return css.getPropertyValue(n).trim(); };
-    var cz = c.cizim || {}, seviye = katman('seviye'), gos = katman('gosterge'), p = katman('plan') ? c.plan : null, poz = pozBul(c.coin), seviyeler = [], sart = [];
+    var cz = c.cizim || {}, seviye = katman('seviye'), gos = katman('gosterge'), liq = katman('likidasyon'), p = katman('plan') ? c.plan : null, poz = pozBul(c.coin), seviyeler = [], sart = [];
     var g = LightweightCharts.createChart(kutu, {
       autoSize: true, layout: { background: { color: 'transparent' }, textColor: r('--sonuk'), fontFamily: 'IBM Plex Sans, system-ui, sans-serif' },
       grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
@@ -823,6 +847,35 @@
       }));
       etiket(p.giris[1], yr, ''); etiket(p.giris[0], yr, ''); etiket(p.stop, r('--short'), 'Stop'); etiket(p.tp1, r('--long'), 'H1'); if (p.tp2) etiket(p.tp2, r('--long'), 'H2');
     }
+    // Tahmini likidasyon: fiyat ekseninin yanında dar ısı şeridi; mumların üstüne boyanmaz
+    if (liq) {
+      turevYukle(c.coin);
+      var liqRenk = r('--liq');
+      kayit.liqKatman = new Katman(function () {}, function (ctx, boy) {
+        var k = turev[c.coin], d = k && k.lik, x = boy.width - 13, sw = 11;
+        ctx.font = '500 10px IBM Plex Sans, system-ui, sans-serif'; ctx.textBaseline = 'top'; ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(14,17,23,0.72)'; var bas = d ? 'Tahmini liq · Binance verisi' : k && !k.yolda ? 'Likidasyon verisi yok' : 'Likidasyon yükleniyor…', bw = ctx.measureText(bas).width + 8;
+        ctx.fillRect(boy.width - bw - 2, 4, bw, 15); ctx.fillStyle = 'rgba(190,197,210,0.85)'; ctx.fillText(bas, boy.width - 6, 6); ctx.textAlign = 'left';
+        if (!d) return;
+        var son = kayit.veri && kayit.veri[kayit.veri.length - 1], fy = son ? son.close : d.fiyat;
+        var hi = mum.coordinateToPrice(22), lo = mum.coordinateToPrice(boy.height); if (hi == null || lo == null) return;
+        var kume = d.kume.filter(function (z) { return z.yon === 'long' ? z.p < fy : z.p > fy; });
+        var n = Math.max(20, Math.floor((boy.height - 22) / 3)), dil = H.likidasyonDilim(kume, lo, hi, n), en = Math.max.apply(null, dil), h = (boy.height - 22) / n;
+        ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fillRect(x, 22, sw, boy.height - 22);
+        if (!(en > 0)) return;
+        dil.forEach(function (v, i) {
+          if (!v) return; var oran_ = v / en;
+          ctx.globalAlpha = 0.15 + 0.85 * Math.pow(oran_, 0.7); ctx.fillStyle = liqRenk; ctx.fillRect(x, boy.height - (i + 1) * h, sw, Math.max(1, h));
+        });
+        ctx.globalAlpha = 1;
+        // en yoğun küme (üstte ve altta): şeridin solunda küçük üçgen; sayılar Türev verisi bölümünde
+        ['ust', 'alt'].forEach(function (z) {
+          var e = d[z]; if (!e) return; var yy = mum.priceToCoordinate(e.p); if (yy == null || yy < 24 || yy > boy.height - 4) return;
+          ctx.fillStyle = liqRenk; ctx.beginPath(); ctx.moveTo(x - 1, yy); ctx.lineTo(x - 7, yy - 4); ctx.lineTo(x - 7, yy + 4); ctx.closePath(); ctx.fill();
+        });
+      });
+      mum.attachPrimitive(kayit.liqKatman);
+    }
     // RSI: ayrı küçük grafik, kaydırma ve yakınlaştırma ana grafikle eş
     var rsiKutu = gos ? $('rsiGrafik') : null;
     if (rsiKutu) {
@@ -851,7 +904,7 @@
         var s = g.addLineSeries({ color: 'rgba(175,183,198,0.8)', lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
         s.setData([{ time: t.t1 + TR_OFS, value: t.p1 }, { time: t.t2 + TR_OFS, value: t.p2 }]);
       });
-      if (veri.length !== uzunluk) g.timeScale().setVisibleLogicalRange({ from: veri.length - (MASA.matches ? 90 : 48), to: veri.length + (p ? (MASA.matches ? 14 : 9) : 3) });
+      if (veri.length !== uzunluk) g.timeScale().setVisibleLogicalRange({ from: veri.length - (MASA.matches ? 90 : 48), to: veri.length + (p ? (MASA.matches ? 14 : 9) : 3) + (liq ? 3 : 0) });
       cizildi = true; uzunluk = veri.length;
     }
     var eski = AYAR.api ? mumOnbellek(c.coin, tf) : null;
