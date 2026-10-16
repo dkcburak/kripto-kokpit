@@ -2,7 +2,7 @@
 var H = require('../hesap.js'), assert = require('assert'), n = 0;
 function t(ad, fn) { fn(); n++; console.log('ok', ad); }
 var L = { yon: 'long', giris: [100, 110], stop: 95, tp1: 125, tp2: 140 };
-var S = { yon: 'short', giris: [100, 110], stop: 115, tp1: 90 };
+var S = { yon: 'short', giris: [100, 110], stop: 115, tp1: 85 };
 t('planGecerli', function () {
   assert(H.planGecerli(L)); assert(H.planGecerli(S));
   assert(!H.planGecerli({ yon: 'long', giris: [100, 110], stop: 105, tp1: 125 }));
@@ -55,10 +55,10 @@ t('rsiSeri', function () {
   var x = H.rsiSeri(k, 14); assert(Math.abs(x[14] - 70.46) < 0.1, x[14]); assert(x[15] < x[14]);
 });
 t('karar', function () {
-  var tamam = { coin: 'X', durum: 'long', plan: L, fiyat: 105, tf: { d: 'yukari', h4: 'yatay', h1: 'onay' }, haberler: [] };
+  var tamam = { coin: 'X', durum: 'long', plan: L, fiyat: 105, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' }, haberler: [] };
   var k = H.karar(tamam, { mod: 'Temkinli' }); assert.strictEqual(k.renk, 'yesil'); assert.strictEqual(k.ad, 'Girişe uygun');
   // 1S onayı yok -> sarı
-  k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yatay', h1: 'yok' } })); assert.strictEqual(k.renk, 'sari'); assert(k.eksik.indexOf('1S onayı yok') >= 0); assert(!k.teknik && k.temel && k.fiyat);
+  k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yukari', h1: 'yok' } })); assert.strictEqual(k.renk, 'sari'); assert(k.eksik.indexOf('1S onayı yok') >= 0); assert(!k.teknik && k.temel && k.fiyat);
   // 4S ters
   k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } })); assert.strictEqual(k.renk, 'sari');
   // ters yüksek haber, aynı yöndeki haber sorun değil
@@ -76,6 +76,43 @@ t('karar', function () {
   assert.strictEqual(H.karar(Object.assign({}, tamam, { durum: 'uzak' })).renk, 'kirmizi');
   // short
   var ks = H.karar({ coin: 'Z', durum: 'short', plan: S, fiyat: 105, tf: { d: 'asagi', h4: 'asagi', h1: 'asagi' }, haberler: [{ etki: 'Yüksek', yon: 'Olumsuz' }] }, { mod: 'Riskten kaçış' });
-  assert.strictEqual(ks.renk, 'yesil');
+  assert.strictEqual(ks.renk, 'yesil'); assert.strictEqual(ks.sinif, 'A'); assert.strictEqual(ks.riskYuzde, 1);
+  // short stopun ötesinde -> kırmızı
+  assert.strictEqual(H.karar({ coin: 'Z', durum: 'short', plan: S, fiyat: 116, tf: { d: 'asagi', h4: 'asagi', h1: 'onay' } }).renk, 'kirmizi');
+  // short B sınıfı: 1G yatay + 4S aşağı; risk %0,5, 1S 'asagi' yetmez, 'onay' gerekir
+  var b = { coin: 'Z', durum: 'short', plan: S, fiyat: 105, tf: { d: 'yatay', h4: 'asagi', h1: 'asagi' } };
+  k = H.karar(b); assert.strictEqual(k.sinif, 'B'); assert.strictEqual(k.riskYuzde, 0.5); assert.strictEqual(k.renk, 'sari');
+  b.tf.h1 = 'onay'; assert.strictEqual(H.karar(b).renk, 'yesil');
+  // short piyasa filtresi ve funding
+  assert.strictEqual(H.karar(b, { mod: 'Risk açık' }).renk, 'sari');
+  assert.strictEqual(H.karar(Object.assign({}, b, { funding: -0.0005 })).renk, 'sari');
+  // trend tersi (C) asla yeşil olmaz
+  k = H.karar({ coin: 'Z', durum: 'short', plan: S, fiyat: 105, tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } }); assert.strictEqual(k.sinif, 'C'); assert.strictEqual(k.renk, 'sari');
+  // 4S yatay long -> sarı
+  assert.strictEqual(H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yatay', h1: 'onay' } })).renk, 'sari');
+  // ücret sonrası kazanç/risk 1,5 altı -> sarı
+  k = H.karar(Object.assign({}, tamam, { plan: { yon: 'long', giris: [100, 110], stop: 95, tp1: 120 } })); assert.strictEqual(k.renk, 'sari'); assert(/ücret sonrası/.test(k.eksik.join()));
+  // eski analiz -> sarı
+  assert.strictEqual(H.karar(tamam, null, { analizSaat: 13 }).renk, 'sari');
+  assert.strictEqual(H.karar(tamam, null, { analizSaat: 3 }).renk, 'yesil');
 });
-console.log(n + '/9 geçti');
+t('planGecerli tp2 sırası', function () {
+  assert(!H.planGecerli({ yon: 'long', giris: [100, 110], stop: 95, tp1: 125, tp2: 120 }));
+  assert(!H.planGecerli({ yon: 'short', giris: [100, 110], stop: 115, tp1: 90, tp2: 95 }));
+});
+t('planHesap risk ve ücret', function () {
+  var h = H.planHesap(L, 0.5); assert(Math.abs(h.poz - 0.5 / 9.5238095 * 100) < 1e-3); assert(h.r1Net < h.r1);
+  assert.strictEqual(H.planHesap(L).riskYuzde, 1);
+});
+t('analizYasi', function () {
+  var simdi = new Date(2026, 9, 16, 14, 0).getTime();
+  assert.strictEqual(H.analizYasi('16 Eki 08:00', simdi), 6);
+  assert.strictEqual(H.analizYasi('15 Eki 19:30', simdi), 18.5);
+  assert.strictEqual(H.analizYasi('', simdi), null);
+  assert(H.analizYasi('31 Ara 10:00', simdi) > 24 * 200);
+});
+t('toplamRisk yön başına', function () {
+  var p = [{ coin: 'A', yon: 'long', giris: 100, buyukluk: 1000, stop: 96 }, { coin: 'B', yon: 'short', giris: 10, buyukluk: 1000, stop: 10.4 }];
+  var r = H.toplamRisk(p, { A: 100, B: 10 }, 1000); assert(Math.abs(r.yuzde - 8) < 1e-9); assert(!r.asildi); assert(Math.abs(r.yonler.short - 4) < 1e-9);
+});
+console.log(n + ' test geçti');
