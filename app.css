@@ -4,7 +4,7 @@
   --yazi:#e9ecf2; --sonuk:#8d95a5; --soluk:#7d8696;
   --vurgu:#e9a13a;
   --long:#2fbf80; --short:#ef5a52; --bekle:#e6b04a; --uzak:#7f8899; --mavi:#5aa9ff; --ema:#a58bff;
-  --short-yon:#d46bd8; --gri-bant:#7c869a;
+  --short-yon:#d46bd8; --gri-bant:#7c869a; --liq:#ffd43b;
   --f-baslik:"Sora",system-ui,sans-serif; --f-metin:"IBM Plex Sans",system-ui,-apple-system,sans-serif; --f-sayi:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
   --r:14px; color-scheme:dark;
 }

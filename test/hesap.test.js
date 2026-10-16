@@ -124,4 +124,22 @@ t('turevHesap', function () {
   assert.strictEqual(H.turevHesap([], null, null, 0), null);
   assert.strictEqual(H.binanceSembol('PEPE'), '1000PEPEUSDT'); assert.strictEqual(H.binanceSembol('SOL'), 'SOLUSDT');
 });
+t('likidasyonHesap', function () {
+  var H0 = 1700000000000, sa = 3600000, oi = [], mum = [], ls = [];
+  // 100 civarı yatay mumlar (tipik fiyat 100); ikinci saatte açık pozisyon 1000 artıyor, long oranı %60
+  for (var i = 0; i < 6; i++) { mum.push([H0 + i * sa, '100', '100.6', '99.4', '100']); oi.push({ timestamp: H0 + (i + 1) * sa, sumOpenInterestValue: i < 1 ? '5000' : '6000' }); ls.push({ timestamp: H0 + (i + 1) * sa, longShortRatio: '1.5' }); }
+  var d = H.likidasyonHesap(oi, mum, ls, 100);
+  assert.strictEqual(d.kume.length, 6, 'yakın 100x kümeleri mumla silinir'); // 100x long 99.5 ve short 100.5'e değdi
+  var top = d.kume.reduce(function (a, k) { return a + k.v; }, 0); assert(Math.abs(top - 1000 * 0.85) < 1e-6);
+  var l10 = d.kume.filter(function (k) { return k.yon === 'long' && Math.abs(k.p - 90.5) < 1e-9; })[0]; assert(l10 && Math.abs(l10.v - 1000 * 0.6 * 0.35) < 1e-9);
+  assert(d.alt.p < 100 && d.ust.p > 100 && d.alt.uzak < 0);
+  // pozisyon yarıya inerse kümeler yarıya iner
+  oi[5].sumOpenInterestValue = '3000';
+  var y = H.likidasyonHesap(oi, mum, ls, 100), top2 = y.kume.reduce(function (a, k) { return a + k.v; }, 0); assert(Math.abs(top2 - top / 2) < 1e-6);
+  // fiyat 92'ye inerse 10x long kümesi (90,5) durur, 25x (96,5) silinir
+  var z = H.likidasyonHesap(oi, mum.concat([[H0 + 6 * sa, '100', '100', '92', '93']]), ls, 93);
+  assert(z.kume.some(function (k) { return k.yon === 'long' && k.p < 91; })); assert(!z.kume.some(function (k) { return k.yon === 'long' && k.p > 93; }));
+  var b = H.likidasyonDilim(d.kume, 80, 120, 40); assert.strictEqual(b.length, 40); assert(b[10] > 0); // 90,5 → dilim 10
+  assert.strictEqual(H.likidasyonHesap([], [], [], 1), null);
+});
 console.log(n + ' test geçti');

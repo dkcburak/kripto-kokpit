@@ -174,10 +174,60 @@
     else if (o.funding != null && o.funding <= -0.0003) o.okuma.push('Funding belirgin negatif: short tutmanın maliyeti arttı.');
     return o;
   }
+  // Tahmini likidasyon kümeleri (bilgi amaçlı; karara girmez).
+  // Her saatte açık pozisyon artışı yeni pozisyon sayılır; o saatin ortalama fiyatından,
+  // long/short hesap oranına göre bölünüp 10/25/50/100x kaldıraçta likidasyon fiyatı hesaplanır.
+  // Pozisyon azalınca tüm kümeler orantılı küçülür; fiyat bir kümeye değdiyse o küme silinir.
+  var LIK_KALDIRAC = [[10, 0.35], [25, 0.3], [50, 0.2], [100, 0.15]], LIK_MM = 0.005;
+  function likidasyonHesap(oiHist, mumlar, lsHist, fiyat) {
+    if (!Array.isArray(oiHist) || !Array.isArray(mumlar) || oiHist.length < 3 || mumlar.length < 3) return null;
+    var mumSaat = {}, oran = {};
+    mumlar.forEach(function (m) { mumSaat[Number(m[0])] = { h: Number(m[2]), l: Number(m[3]), o: (Number(m[2]) + Number(m[3]) + Number(m[4])) / 3 }; });
+    (lsHist || []).forEach(function (x) { var r = Number(x.longShortRatio); if (r > 0) oran[Number(x.timestamp)] = r / (1 + r); });
+    var kume = [], onceki = null, sonOran = 0.5, sonT = 0;
+    oiHist.forEach(function (x) {
+      var t = Number(x.timestamp), v = Number(x.sumOpenInterestValue), m = mumSaat[t - 3600000] || mumSaat[t];
+      if (oran[t] != null) sonOran = oran[t];
+      if (!(v > 0)) return;
+      if (m) kume.forEach(function (k) { if (k.yon === 'long' ? m.l <= k.p : m.h >= k.p) k.v = 0; });
+      if (onceki != null && m) {
+        if (v > onceki) {
+          var yeni = v - onceki;
+          LIK_KALDIRAC.forEach(function (lk) {
+            kume.push({ p: m.o * (1 - 1 / lk[0] + LIK_MM), v: yeni * sonOran * lk[1], yon: 'long' });
+            kume.push({ p: m.o * (1 + 1 / lk[0] - LIK_MM), v: yeni * (1 - sonOran) * lk[1], yon: 'short' });
+          });
+        } else { var o = v / onceki; kume.forEach(function (k) { k.v *= o; }); }
+      }
+      onceki = v; sonT = t;
+    });
+    // son açık pozisyon kaydından sonraki mumlar da kümeleri siler
+    mumlar.forEach(function (m) { if (Number(m[0]) >= sonT) kume.forEach(function (k) { if (k.yon === 'long' ? Number(m[3]) <= k.p : Number(m[2]) >= k.p) k.v = 0; }); });
+    var son = mumlar[mumlar.length - 1];
+    var f = Number(fiyat) > 0 ? Number(fiyat) : Number(son[4]);
+    kume = kume.filter(function (k) { return k.v > 0 && (k.yon === 'long' ? k.p < f : k.p > f); });
+    if (!kume.length) return null;
+    // Özet: fiyatın %0,5'lik dilimlerinde en yoğun küme, üstte (short likidasyonu) ve altta (long likidasyonu)
+    var dilim = {}, en = { ust: null, alt: null };
+    kume.forEach(function (k) { var d = Math.round(Math.log(k.p / f) / Math.log(1.005)); dilim[d] = (dilim[d] || 0) + k.v; });
+    Object.keys(dilim).forEach(function (d) {
+      d = Number(d); if (!d || Math.abs(d) > 30) return;
+      var yer = d > 0 ? 'ust' : 'alt', p = f * Math.pow(1.005, d);
+      if (!en[yer] || dilim[d] > en[yer].v) en[yer] = { p: p, v: dilim[d], uzak: (p / f - 1) * 100 };
+    });
+    return { kume: kume, fiyat: f, ust: en.ust, alt: en.alt };
+  }
+  // Grafik şeridi için: lo–hi aralığını n dilime böler, her dilimdeki tahmini tutar
+  function likidasyonDilim(kume, lo, hi, n) {
+    var d = []; for (var i = 0; i < n; i++) d.push(0);
+    if (!(hi > lo) || !kume) return d;
+    kume.forEach(function (k) { if (k.p < lo || k.p >= hi) return; d[Math.floor((k.p - lo) / (hi - lo) * n)] += k.v; });
+    return d;
+  }
   var BINANCE_AD = { PEPE: '1000PEPE', SHIB: '1000SHIB', BONK: '1000BONK', FLOKI: '1000FLOKI', SATS: '1000SATS', LUNC: '1000LUNC', XEC: '1000XEC', RATS: '1000RATS', CAT: '1000CAT' };
   function binanceSembol(coin) { return (BINANCE_AD[coin] || coin) + 'USDT'; }
   function guvenliUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? String(u) : ''; }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, binanceSembol: binanceSembol };
+  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
