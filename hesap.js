@@ -175,9 +175,6 @@
     return o;
   }
   // Tahmini likidasyon kümeleri (bilgi amaçlı; karara girmez).
-  // Her saatte açık pozisyon artışı yeni pozisyon sayılır; o saatin ortalama fiyatından,
-  // long/short hesap oranına göre bölünüp 10/25/50/100x kaldıraçta likidasyon fiyatı hesaplanır.
-  // Pozisyon azalınca tüm kümeler orantılı küçülür; fiyat bir kümeye değdiyse o küme silinir.
   var LIK_KALDIRAC = [[10, 0.35], [25, 0.3], [50, 0.2], [100, 0.15]], LIK_MM = 0.005;
   function likidasyonHesap(oiHist, mumlar, lsHist, fiyat) {
     if (!Array.isArray(oiHist) || !Array.isArray(mumlar) || oiHist.length < 3 || mumlar.length < 3) return null;
@@ -201,13 +198,11 @@
       }
       onceki = v; sonT = t;
     });
-    // son açık pozisyon kaydından sonraki mumlar da kümeleri siler
     mumlar.forEach(function (m) { if (Number(m[0]) >= sonT) kume.forEach(function (k) { if (k.yon === 'long' ? Number(m[3]) <= k.p : Number(m[2]) >= k.p) k.v = 0; }); });
     var son = mumlar[mumlar.length - 1];
     var f = Number(fiyat) > 0 ? Number(fiyat) : Number(son[4]);
     kume = kume.filter(function (k) { return k.v > 0 && (k.yon === 'long' ? k.p < f : k.p > f); });
     if (!kume.length) return null;
-    // Özet: fiyatın %0,5'lik dilimlerinde en yoğun küme, üstte (short likidasyonu) ve altta (long likidasyonu)
     var dilim = {}, en = { ust: null, alt: null };
     kume.forEach(function (k) { var d = Math.round(Math.log(k.p / f) / Math.log(1.005)); dilim[d] = (dilim[d] || 0) + k.v; });
     Object.keys(dilim).forEach(function (d) {
@@ -217,7 +212,6 @@
     });
     return { kume: kume, fiyat: f, ust: en.ust, alt: en.alt };
   }
-  // Grafik şeridi için: lo–hi aralığını n dilime böler, her dilimdeki tahmini tutar
   function likidasyonDilim(kume, lo, hi, n) {
     var d = []; for (var i = 0; i < n; i++) d.push(0);
     if (!(hi > lo) || !kume) return d;
@@ -228,6 +222,87 @@
   function binanceSembol(coin) { return (BINANCE_AD[coin] || coin) + 'USDT'; }
   function guvenliUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? String(u) : ''; }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol };
+  // ---- AĞIRLIKLI CONFLUENCE SKORU (Faz 1) ----
+  // Mevcut karar() AND mantığını bozmaz; paralel çalışır.
+  // Amaç: sinyal kalitesini puanlamak, eşik üstünde "sinyal var" demek.
+  // Kural: 4S ters yöndeyse veya fiyat stop ötesindeyse skor 0 (otomatik veto).
+  var SKOR_AGIRLIK = {
+    h4: 3, d: 2, h1: 2, m15: 2, rr: 2, funding: 1, haber: 2, rejim: 1, fiyat: 2
+  };
+  var SKOR_MAX = 17;
+  var SKOR_ESIK = { A_PLUS: 14, A: 11, B: 8 };
+
+  function m15Zamanlama(m15, yon) {
+    if (!m15 || typeof m15.rsi !== 'number') return { puan: 0, maks: 3, sebep: '15m verisi yok' };
+    var puan = 0, sebepler = [];
+    if (yon === 'long') {
+      if (m15.rsi >= 40 && m15.rsi <= 65) { puan += 1; sebepler.push('15m RSI uygun'); }
+      else if (m15.rsi > 75) sebepler.push('15m RSI aşırı alım');
+      else if (m15.rsi < 30) sebepler.push('15m RSI aşırı satım');
+    } else {
+      if (m15.rsi >= 35 && m15.rsi <= 60) { puan += 1; sebepler.push('15m RSI uygun'); }
+      else if (m15.rsi < 25) sebepler.push('15m RSI aşırı satım');
+      else if (m15.rsi > 70) sebepler.push('15m RSI aşırı alım');
+    }
+    if (m15.ema9 && m15.ema21) {
+      var emaUygun = yon === 'long' ? m15.ema9 > m15.ema21 : m15.ema9 < m15.ema21;
+      if (emaUygun) { puan += 1; sebepler.push('15m EMA hizası uygun'); }
+      else sebepler.push('15m EMA ters');
+    }
+    if (m15.hacim && m15.hacimOrt && m15.hacim > m15.hacimOrt * 1.1) { puan += 1; sebepler.push('15m hacim onaylı'); }
+    else if (m15.hacim && m15.hacimOrt && m15.hacim < m15.hacimOrt * 0.7) sebepler.push('15m hacim zayıf');
+    return { puan: Math.min(3, puan), maks: 3, sebep: sebepler.join(', ') };
+  }
+
+  function sinyalSkoru(c, piyasa, ek) {
+    var o = { skor: 0, maks: SKOR_MAX, sinif: 'yok', yon: null, renk: 'kirmizi', ad: 'Sinyal yok', veto: null, eksik: [], detay: {} };
+    if (!c || !c.plan) { o.eksik.push('plan yok'); return o; }
+    var k = karar(c, piyasa, ek);
+    o.yon = k.yon || (c.plan.yon === 'short' ? 'short' : 'long');
+    o.detay.karar = k;
+    if (k.neden && k.neden.indexOf('stopun ötesinde') >= 0) { o.veto = 'Fiyat stopun ötesinde'; o.eksik.push(o.veto); return o; }
+    var yon = o.yon, tf = c.tf || {};
+    if (tf.h4 === TERS[yon]) { o.veto = '4S ters yönde'; o.eksik.push(o.veto); return o; }
+    var skor = 0;
+    if (tf.h4 === AYNI[yon]) skor += SKOR_AGIRLIK.h4; else o.eksik.push('4S plan yönünde değil');
+    o.detay.h4 = tf.h4;
+    if (tf.d === AYNI[yon]) skor += SKOR_AGIRLIK.d;
+    else if (tf.d === 'yatay') skor += SKOR_AGIRLIK.d * 0.5;
+    else o.eksik.push('1G ters');
+    o.detay.d = tf.d;
+    if (tf.h1 === 'onay' || tf.h1 === AYNI[yon]) skor += SKOR_AGIRLIK.h1; else o.eksik.push('1S onay yok');
+    o.detay.h1 = tf.h1;
+    var m15 = m15Zamanlama(c.m15, yon);
+    skor += m15.puan * (SKOR_AGIRLIK.m15 / 3);
+    o.detay.m15 = m15;
+    if (m15.puan < 2) o.eksik.push('15m zamanlama zayıf: ' + m15.sebep);
+    var h = k.h || planHesap(c.plan, (planSinif(c) || {}).riskYuzde);
+    if (h.r1Net >= 1.5) skor += SKOR_AGIRLIK.rr; else o.eksik.push('R:R ' + (Math.floor(h.r1Net * 100) / 100) + ' (< 1,5)');
+    o.detay.rr = h.r1Net;
+    if (typeof c.funding === 'number') {
+      var fundingOk = yon === 'short' ? c.funding > -0.0003 : c.funding < 0.001;
+      if (fundingOk) skor += SKOR_AGIRLIK.funding; else o.eksik.push('funding aşırı');
+    } else { skor += SKOR_AGIRLIK.funding; }
+    o.detay.funding = c.funding;
+    var tersHaber = yon === 'long' ? 'Olumsuz' : 'Olumlu', haberTemiz = true;
+    (c.haberler || []).forEach(function (hb) { if (hb && hb.etki === 'Yüksek' && hb.yon === tersHaber) haberTemiz = false; });
+    if (haberTemiz) skor += SKOR_AGIRLIK.haber; else o.eksik.push('ters yönde yüksek haber');
+    o.detay.haber = haberTemiz;
+    var rejimOk = !(yon === 'long' && piyasa && piyasa.mod === 'Riskten kaçış') && !(yon === 'short' && piyasa && piyasa.mod === 'Risk açık');
+    if (rejimOk) skor += SKOR_AGIRLIK.rejim; else o.eksik.push('piyasa rejimi ters');
+    o.detay.rejim = piyasa && piyasa.mod;
+    var g = k.g;
+    if (g && g.tur === 'bolgede') skor += SKOR_AGIRLIK.fiyat;
+    else if (g && g.tur === 'uzak') o.eksik.push('fiyat girişe uzak (%' + (Math.round(g.girise * 10) / 10) + ')');
+    o.detay.fiyat = g && g.tur;
+    o.skor = Math.round(skor * 10) / 10;
+    if (o.skor >= SKOR_ESIK.A_PLUS) { o.sinif = 'A+'; o.renk = 'yesil'; o.ad = 'Güçlü ' + (yon === 'long' ? 'LONG' : 'SHORT'); }
+    else if (o.skor >= SKOR_ESIK.A) { o.sinif = 'A'; o.renk = 'yesil'; o.ad = (yon === 'long' ? 'LONG' : 'SHORT') + ' sinyali'; }
+    else if (o.skor >= SKOR_ESIK.B) { o.sinif = 'B'; o.renk = 'sari'; o.ad = 'Zayıf sinyal · bekle'; }
+    else { o.sinif = 'yok'; o.renk = 'kirmizi'; o.ad = 'Sinyal yok'; }
+    return o;
+  }
+
+  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
