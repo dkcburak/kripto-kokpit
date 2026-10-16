@@ -406,3 +406,12 @@ details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
 .eylem{display:grid;gap:8px}
 .eylem-bilgi{margin:0;font-size:13.5px;color:var(--sonuk);background:var(--yuzey);border:1px solid var(--cizgi);border-radius:12px;padding:11px 14px}
 .grafik-blok:fullscreen .katmanlar,.grafik-blok.tam-ekran .katmanlar{flex:none}
+.turev{display:grid;gap:10px}
+.turev h2{margin:0}
+.turev-ust{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.turev-ust>div{display:grid;gap:1px}
+.turev-ust b{font-size:18px;font-weight:500}
+.turev-ust small{font-size:12.5px}
+.kucuk-cizgi{flex:none}
+.okuma{margin:0;padding:0 0 0 18px;display:grid;gap:4px;font-size:13.5px}
+.okuma li::marker{color:var(--sonuk)}

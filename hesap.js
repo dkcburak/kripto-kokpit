@@ -154,8 +154,30 @@
     }
     return out;
   }
+  // Türev verisi (Binance açık verisi): açık pozisyon (OI) 24s değişimi, long/short hesap oranı, funding ve kısa okuma.
+  // Bilgi amaçlıdır; "Girişe uygun" kararına girmez. Binance, MEXC'teki pozisyonları göstermez.
+  function turevHesap(oiHist, ls, pi, deg24) {
+    if (!Array.isArray(oiHist) || oiHist.length < 2) return null;
+    var seri = oiHist.map(function (x) { return Number(x.sumOpenInterestValue); }).filter(function (x) { return x > 0; });
+    if (seri.length < 2) return null;
+    var son = seri[seri.length - 1], oiDeg = (son / seri[0] - 1) * 100;
+    var oran = ls && ls[0] ? Number(ls[0].longShortRatio) : null, fon = pi && pi.lastFundingRate != null ? Number(pi.lastFundingRate) : null;
+    var o = { oi: son, oiDeg24: oiDeg, seri: seri, ls: isFinite(oran) ? oran : null, longYuzde: isFinite(oran) && oran > 0 ? oran / (1 + oran) * 100 : null, funding: isFinite(fon) ? fon : null, okuma: [] };
+    var d = typeof deg24 === 'number' && isFinite(deg24) ? deg24 : 0, fy = d > 1 ? 1 : d < -1 ? -1 : 0, oy = oiDeg > 2 ? 1 : oiDeg < -2 ? -1 : 0;
+    if (!oy) o.okuma.push('Açık pozisyon yatay: hareket yeni para getirmiyor.');
+    else if (fy > 0) o.okuma.push(oy > 0 ? 'Fiyat ve açık pozisyon birlikte artıyor: yeni long girişi yükselişi destekliyor.' : 'Fiyat artarken açık pozisyon düşüyor: yükseliş short kapanışından geliyor, zayıf olabilir.');
+    else if (fy < 0) o.okuma.push(oy > 0 ? 'Fiyat düşerken açık pozisyon artıyor: yeni short girişi düşüşü destekliyor.' : 'Fiyat ve açık pozisyon birlikte düşüyor: long kapanışı ve likidasyon; satış baskısı azalabilir.');
+    else o.okuma.push(oy > 0 ? 'Fiyat yatayken açık pozisyon artıyor: sert bir kırılma için birikim var.' : 'Fiyat yatayken açık pozisyon azalıyor: pozisyonlar kapanıyor, piyasa sakinleşiyor.');
+    if (o.ls != null && o.ls >= 2.5) o.okuma.push('Hesapların çoğu long: kalabalık taraf long, aşağı sert iğne riski var.');
+    else if (o.ls != null && o.ls <= 0.8) o.okuma.push('Hesapların çoğu short: short sıkışması (yukarı sert hareket) riski var.');
+    if (o.funding != null && o.funding >= 0.0005) o.okuma.push('Funding yüksek: long tutmanın maliyeti arttı.');
+    else if (o.funding != null && o.funding <= -0.0003) o.okuma.push('Funding belirgin negatif: short tutmanın maliyeti arttı.');
+    return o;
+  }
+  var BINANCE_AD = { PEPE: '1000PEPE', SHIB: '1000SHIB', BONK: '1000BONK', FLOKI: '1000FLOKI', SATS: '1000SATS', LUNC: '1000LUNC', XEC: '1000XEC', RATS: '1000RATS', CAT: '1000CAT' };
+  function binanceSembol(coin) { return (BINANCE_AD[coin] || coin) + 'USDT'; }
   function guvenliUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? String(u) : ''; }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri };
+  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, binanceSembol: binanceSembol };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
