@@ -6,7 +6,8 @@ Burak Bey'in coin takip uygulaması; ekranda adı **dKc**. Repo ve adres `kripto
 - **Veri:** Apps Script "Kripto Alarm Motoru" `doGet` (`?k=ANAHTAR&f=ozet` ve `&f=mum&coin=SOL&tf=h4`). Kod: `/mnt/project-files/kripto/alarm-motoru/Kod.gs`.
 - **Analiz:** Claude rutinleri 08:00/19:30 `kokpit-analiz-*.json` yazar (bkz. `ANALIZ-FORMATI.md`, kontrol: `analiz-kontrol.js`).
 - **Bildirim:** OneSignal web push (`bildirim.js`, `OneSignalSDKWorker.js`). Apps Script alarm çalınca OneSignal REST API'ye gönderir (`ONESIGNAL_KEY`, `ONESIGNAL_APP_ID` Script Properties'te).
-- **Girişe uygun (trafik ışığı):** `hesap.js` `karar()`. Yeşil: analiz plan yönünde hazır, 1G/4S ters değil, 1S onaylı, ters yönde "Yüksek" haber yok (long'da piyasa "Riskten kaçış" değil) ve fiyat giriş bölgesinde. Sarı: plan var, eksik koşul yazılır. Kırmızı: plan yok, geçersiz ya da stop geçildi. Emir değildir.
+- **Girişe uygun (trafik ışığı):** `hesap.js` `karar()`. Yeşil: analiz plan yönünde hazır, 4S plan yönünde ve 1G ters değil (sınıf A: 1G de aynı yönde, risk %1; sınıf B: 1G yatay, risk %0,5 ve 1S "onay" şart), 1S onaylı, ücret sonrası Hedef 1 kazanç/riski en az 1,5, 5x içinde, analiz 12 saatten yeni, ters yönde "Yüksek" haber yok, piyasa filtresi (long: "Riskten kaçış" değil, short: "Risk açık" değil), funding aşırı değil ve fiyat giriş bölgesinde. Sarı: plan var, eksik koşul yazılır. Kırmızı: plan yok, geçersiz ya da stop geçildi. Emir değildir.
+- **Grafik katmanları:** Plan (giriş kutusu, stop/hedef alanı, R), Seviyeler (gri destek/direnç bandı, tepe/dip), RSI · Hacim. Lightweight Charts primitive ile tuvale çizilir. Telefonda varsayılan yalnız Plan.
 - **Grafik hızı:** mumlar cihazda saklanır (en fazla 30), grafik anında açılır, arkada yenilenir; ana ekranda önceden yüklenir.
 - **Ayar:** `ayar.js`; `api` boşsa uygulama örnek veriyle (`ornek.js`) açılır.
 
