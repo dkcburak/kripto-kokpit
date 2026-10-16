@@ -307,7 +307,7 @@
         '<span class="pk-satir"><span>Giriş</span><span class="sayi">' + f(p.giris[0]) + ' – ' + f(p.giris[1]) + '</span></span>' +
         '<span class="pk-satir"><span>Stop</span><span class="sayi eks">' + f(p.stop) + ' <span class="soluk-yazi">(' + yuzde(h.stopYuzde) + ')</span></span></span>' +
         '<span class="pk-satir"><span>Hedef 1 · 2</span><span class="sayi art">' + f(p.tp1) + (p.tp2 ? ' · ' + f(p.tp2) : '') + '</span></span>' +
-        '<span class="pk-satir"><span>Kazanç/risk · pozisyon</span><span class="sayi">' + oran(h.r1Net) + 'R · %' + f(h.poz, 0) + ' <span class="soluk-yazi">(%' + f(h.riskYuzde, 1) + ' risk)</span></span></span>' +
+        '<span class="pk-satir"><span>Kazanç/risk · poz.</span><span class="sayi">' + oran(h.r1Net) + 'R · %' + f(h.poz, 0) + '</span></span>' +
         '<span class="pk-alt">' + esc(x[1].not || '') + '</span>' + yakinlik(x[1]) + '</a>';
     }).join('') + '</div>' : '<p class="bos">Şu an işlem planı olan coin yok. Analiz günde 2 kez yenilenir.</p>') + '</section>';
 
