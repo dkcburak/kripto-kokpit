@@ -93,8 +93,10 @@ t('karar', function () {
   // ücret sonrası kazanç/risk 1,5 altı -> sarı
   k = H.karar(Object.assign({}, tamam, { plan: { yon: 'long', giris: [100, 110], stop: 95, tp1: 120 } })); assert.strictEqual(k.renk, 'sari'); assert(/ücret sonrası/.test(k.eksik.join()));
   // eski analiz -> sarı
-  assert.strictEqual(H.karar(tamam, null, { analizSaat: 13 }).renk, 'sari');
+  assert.strictEqual(H.karar(tamam, null, { analizSaat: 14 }).renk, 'sari');
   assert.strictEqual(H.karar(tamam, null, { analizSaat: 3 }).renk, 'yesil');
+  // 12,5 saatlik gece arası artık eski sayılmaz (sınır 13 saat)
+  assert.strictEqual(H.karar(tamam, null, { analizSaat: 12.5 }).renk, 'yesil');
 });
 t('planGecerli tp2 sırası', function () {
   assert(!H.planGecerli({ yon: 'long', giris: [100, 110], stop: 95, tp1: 125, tp2: 120 }));
@@ -164,8 +166,8 @@ t('sinyalSkoru hatalı: veto ve tavan', function () {
   assert.strictEqual(sk({ durum: 'long', fiyat: 105, plan: P, tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } }).veto, '4S ters yönde');
   assert.strictEqual(sk({ durum: 'long', fiyat: 105, plan: { yon: 'long', giris: 100 }, tf: tf }).veto, 'Plan verisi hatalı');
   assert.strictEqual(sk(null).skor, 0);
-  // eski analiz: puan yüksek ama en fazla B
-  s = sk({ durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: tf }, { analizSaat: 13 });
+  // eski analiz (14 saat): puan yüksek ama en fazla B
+  s = sk({ durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: tf }, { analizSaat: 14 });
   assert(s.skor >= H.SKOR_ESIK.A); assert.strictEqual(s.sinif, 'B'); assert.strictEqual(s.renk, 'sari');
   // B sınıfında 1S onayı yoksa yeşil olmaz
   s = sk({ durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: { d: 'yatay', h4: 'yukari', h1: 'bekliyor' } });
@@ -247,12 +249,59 @@ t('sinyalSkoruHaber hatalı: ters haber, veto ve tavan korunur', function () {
   var c = { durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: tf, haberler: [{ yon: 'Olumsuz', etki: 'Yüksek', saat: 1 }, { yon: 'Olumsuz', etki: 'Yüksek', saat: 2 }] };
   var s = H.sinyalSkoruHaber(c, { mod: 'Temkinli' }, { analizSaat: 2 });
   assert.strictEqual(s.skor, 0); assert.strictEqual(s.sinif, 'yok'); assert(/Güçlü ters haber/.test(s.veto));
-  // eski analiz (13 saat) en fazla B kalır, güçlü olumlu haberle bile
-  c.haberler = guclu; s = H.sinyalSkoruHaber(c, { mod: 'Temkinli' }, { analizSaat: 13 });
+  // eski analiz (14 saat) en fazla B kalır, güçlü olumlu haberle bile
+  c.haberler = guclu; s = H.sinyalSkoruHaber(c, { mod: 'Temkinli' }, { analizSaat: 14 });
   assert(s.skor >= H.SKOR_ESIK.A_PLUS); assert.strictEqual(s.sinif, 'B');
   // mevcut veto haberle geri gelmez
   s = H.sinyalSkoruHaber({ durum: 'uzak', fiyat: 105, plan: P, tf: tf, haberler: guclu }, { mod: 'Temkinli' });
   assert.strictEqual(s.veto, 'Analiz: uzak dur'); assert.strictEqual(s.skor, 0);
   assert.strictEqual(H.sinyalSkoruHaber(null).skor, 0);
+});
+t('dominansEngeli ve planSinif', function () {
+  var yuk = { dominans: { usdt: { h4: 'yukari' }, btc: { h4: 'yatay' } } };
+  assert.strictEqual(H.dominansEngeli('SOL', 'long', null), null);
+  assert(/USDT\.D yükseliyor/.test(H.dominansEngeli('BTC', 'long', yuk)));
+  assert.strictEqual(H.dominansEngeli('SOL', 'short', yuk), null);
+  assert(/USDT\.D düşüyor/.test(H.dominansEngeli('SOL', 'short', { dominans: { usdt: { h4: 'asagi' } } })));
+  var btcD = { dominans: { usdt: { h4: 'yatay' }, btc: { h4: 'yukari' } } };
+  assert(/BTC\.D/.test(H.dominansEngeli('SOL', 'long', btcD)));
+  assert.strictEqual(H.dominansEngeli('BTC', 'long', btcD), null); // BTC.D yükselişi BTC long'a engel değil
+  // A planı ters dominance ile B'ye iner: risk %0,5 ve analizdeki 'yukari' 1S yetmez, onay şart
+  var c = { coin: 'SOL', durum: 'long', plan: L, fiyat: 105, tf: { d: 'yukari', h4: 'yukari', h1: 'yukari' }, haberler: [] };
+  assert.strictEqual(H.planSinif(c).sinif, 'A');
+  assert.strictEqual(H.planSinif(c, btcD).sinif, 'B'); assert.strictEqual(H.planSinif(c, btcD).riskYuzde, 0.5);
+  var k = H.karar(c, btcD); assert.strictEqual(k.sinif, 'B'); assert.strictEqual(k.renk, 'sari'); assert(/BTC\.D/.test(k.dominans));
+  c.h1Canli = 'onay'; k = H.karar(c, btcD); assert.strictEqual(k.renk, 'yesil'); assert.strictEqual(k.riskYuzde, 0.5);
+});
+t('h1Onay canlı 1 saatlik onay', function () {
+  var m = function (o, h, l, c) { return { open: o, high: h, low: l, close: c }; }, acik = m(106, 107, 105, 106);
+  // long 100-110: bölgeye değip yukarı kapandı -> onay
+  assert.strictEqual(H.h1Onay([m(115, 116, 112, 113), m(113, 113, 108, 109), m(109, 110, 104, 105), m(105, 108, 104, 107), acik], L).durum, 'onay');
+  // değdi ama son mum aşağı kapandı -> bekliyor
+  assert.strictEqual(H.h1Onay([m(115, 116, 112, 113), m(113, 113, 108, 109), m(109, 110, 104, 107), m(107, 108, 104, 105), acik], L).durum, 'bekliyor');
+  // son kapanış bölgenin altında -> yok
+  assert.strictEqual(H.h1Onay([m(115, 116, 112, 113), m(113, 113, 100, 101), m(101, 102, 97, 98), m(98, 99.5, 97, 99), acik], L).durum, 'yok');
+  // bölgeye hiç değmedi -> bekliyor
+  var r = H.h1Onay([m(120, 121, 118, 119), m(119, 121, 115, 116), m(116, 118, 112, 113), m(113, 116, 112, 115), acik], L);
+  assert.strictEqual(r.durum, 'bekliyor'); assert(/değmedi/.test(r.sebep));
+  // açık (son) mum sayılmaz: yalnız açık mum değdi -> bekliyor
+  assert.strictEqual(H.h1Onay([m(120, 121, 118, 119), m(119, 121, 115, 116), m(116, 118, 112, 113), m(113, 116, 112, 115), m(115, 115, 105, 106)], L).durum, 'bekliyor');
+  // short 100-110 (stop 115): bölgeye değip aşağı kapandı -> onay
+  assert.strictEqual(H.h1Onay([m(95, 98, 94, 97), m(97, 102, 96, 101), m(101, 106, 100, 105), m(105, 106, 101, 102), acik], S).durum, 'onay');
+  // eksik veri
+  assert.strictEqual(H.h1Onay(null, L).durum, 'bekliyor'); assert.strictEqual(H.h1Onay([acik], L).durum, 'bekliyor');
+});
+t('tek kural: karar yeşil değilse skor A/A+ olmaz, canlı 1S skoru da açar', function () {
+  var P = { yon: 'long', giris: [100, 110], stop: 95, tp1: 140 };
+  var c = { coin: 'SOL', durum: 'bekle', fiyat: 105, funding: 0.0001, plan: P, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' }, haberler: [] };
+  var s = H.sinyalSkoru(c, { mod: 'Temkinli' }, { analizSaat: 2 });
+  assert(s.skor >= H.SKOR_ESIK.A); assert.strictEqual(s.sinif, 'B'); // analiz 'bekle' diyor -> ekran sarı, bildirim de yok
+  c.durum = 'long'; c.tf = { d: 'yatay', h4: 'yukari', h1: 'bekliyor' };
+  assert.notStrictEqual(H.sinyalSkoru(c, { mod: 'Temkinli' }, { analizSaat: 2 }).sinif, 'A');
+  c.h1Canli = 'onay'; s = H.sinyalSkoru(c, { mod: 'Temkinli' }, { analizSaat: 2 });
+  assert.strictEqual(H.karar(c, { mod: 'Temkinli' }, { analizSaat: 2 }).renk, 'yesil'); assert(s.sinif === 'A' || s.sinif === 'A+');
+  // ters dominance skorun rejim puanını düşürür
+  var d = H.sinyalSkoru(c, { mod: 'Temkinli', dominans: { usdt: { h4: 'yukari' } } }, { analizSaat: 2 });
+  assert(d.skor < s.skor); assert(/dominance/.test(d.eksik.join()));
 });
 console.log(n + ' test geçti');

@@ -8,7 +8,7 @@ window.KOKPIT_ORNEK = (function () {
   return {
     ornek: true,
     analizZamani: '12 Eki 08:00',
-    piyasa: { mod: 'Temkinli', btc: 'Yatay', korku: { deger: 38, etiket: 'Korku' }, not: 'BTC 82.500 desteği üstünde kaldıkça altcoinlerde seçici long aranabilir.' },
+    piyasa: { mod: 'Temkinli', btc: 'Yatay', korku: { deger: 38, etiket: 'Korku' }, dominans: { btc: { deger: 60.4, h4: 'yukari', d: 'yukari' }, usdt: { deger: 6.76, h4: 'yatay', d: 'yukari' } }, not: 'BTC 82.500 desteği üstünde kaldıkça altcoinlerde seçici long aranabilir.' },
     coinler: [
       c('SOL', 107.2, 2.4, 'long', 'Fiyat 105,5–106,5 destek bölgesine yaklaşıyor. 1 saatlikte dönüş mumu gelirse long planı devreye girer.',
         { d: 'yukari', h4: 'yukari', h1: 'bekliyor' }, p('long', 105.5, 106.5, 101.5, 112.8, 119.7, '4 saatlik kapanış 101,5 altında olursa plan iptal.'),
@@ -46,6 +46,7 @@ window.KOKPIT_ORNEK = (function () {
       { coin: 'NEAR', tur: 'giris', seviye: 5.05, durum: 'bekliyor' }, { coin: 'NEAR', tur: 'stop', seviye: 5.42, durum: 'bekliyor' },
       { coin: 'XRP', tur: 'giris', seviye: 1.365, durum: 'bekliyor' }, { coin: 'XRP', tur: 'stop', seviye: 1.31, durum: 'bekliyor' }
     ],
+    karne: { gun: 7, plan: 9, bekliyor: 1, girdi: 1, tp1: 1, stop: 5, gelmedi: 1, iptal: 0, sinyal: 0, sinyalTp1: 0, sinyalStop: 0, isabet: 17 },
     tetiklenen: [
       { zaman: '11 Eki 21:40', coin: 'HYPE', tur: 'tp1', seviye: 89, fiyat: 89.1 }
     ]

@@ -3,7 +3,7 @@
   'use strict';
   var RISK_TAVAN = 5; // aynı yönde açık toplam risk tavanı, sermayenin %'si
   var UCRET = 0.001;  // giriş+çıkış ücret ve kayma payı (temkinli, işlem değerinin %0,1'i; MEXC tarifesi doğrulanmalı)
-  var ESKI_SAAT = 12; // bundan eski analizle "Girişe uygun" denmez
+  var ESKI_SAAT = 13; // bundan eski analizle "Girişe uygun" denmez (akşam 19:30 -> sabah 08:00 arası 12,5 saat)
 
   function sayi(x) { return typeof x === 'number' && isFinite(x) && x > 0; }
 
@@ -20,14 +20,46 @@
   // Plan sınıfı: A = 1G ve 4S plan yönünde, B = 1G yatay + 4S plan yönünde, C = trend tersi.
   // Analiz sinif yazmışsa ve trendle çelişmiyorsa onu kullanır; risk A'da %1, B'de %0,5, C'de yayın yok.
   var AYNI = { long: 'yukari', short: 'asagi' }, TERS = { long: 'asagi', short: 'yukari' };
-  function planSinif(c) {
+  function planSinif(c, piyasa) {
     var p = c && c.plan; if (!p) return null;
     var yy = AYNI[p.yon === 'short' ? 'short' : 'long'], tf = c.tf || {};
     var s = tf.h4 !== yy ? 'C' : tf.d === yy ? 'A' : tf.d === 'yatay' ? 'B' : 'C';
     if (s === 'A' && p.sinif === 'B') s = 'B';
+    // Dominance planın tersine akıyorsa A planı B'ye iner (risk %0,5, girişte 1S onayı şart)
+    if (s === 'A' && dominansEngeli(c.coin, p.yon, piyasa)) s = 'B';
     var tavan = s === 'A' ? 1 : s === 'B' ? 0.5 : 0;
     var risk = typeof p.riskYuzde === 'number' && p.riskYuzde > 0 ? Math.min(p.riskYuzde, tavan) : tavan;
     return { sinif: s, riskYuzde: risk };
+  }
+
+  // Dominance engeli: piyasa.dominans = { btc: { deger, h4, d }, usdt: { deger, h4, d } } (h4/d: yukari|asagi|yatay).
+  // USDT.D 4S yükselirken para stabil coine kaçar: long'a engel. USDT.D 4S düşerken short'a engel.
+  // BTC.D 4S yükselirken altcoin long'a engel. Veri yoksa engel yok (null). Döner: neden metni ya da null.
+  function dominansEngeli(coin, yon, piyasa) {
+    var dm = piyasa && piyasa.dominans; if (!dm || typeof dm !== 'object') return null;
+    var u = dm.usdt && dm.usdt.h4, b = dm.btc && dm.btc.h4, alt = String(coin || '').toUpperCase() !== 'BTC';
+    if (yon === 'short') return u === 'asagi' ? 'USDT.D düşüyor (para piyasaya giriyor)' : null;
+    if (u === 'yukari') return 'USDT.D yükseliyor (para stabil coine kaçıyor)';
+    if (alt && b === 'yukari') return 'BTC.D yükseliyor (altcoin aleyhine)';
+    return null;
+  }
+
+  // Canlı 1 saatlik onay. mumlar: 1S mumları {open, high, low, close}, en eskiden yeniye; son mum açık (yarım) sayılır.
+  // onay: son 3 kapanmış mumdan biri giriş bölgesine değmiş, son kapanmış mum plan yönünde kapanmış ve kapanış
+  // bölgede ya da bölgenin hedef tarafında (Hedef 1'e varmadan). yok: son kapanış bölgenin stop tarafında. Aksi: bekliyor.
+  function h1Onay(mumlar, plan) {
+    var o = { durum: 'bekliyor', sebep: '1S verisi yok' };
+    if (!plan || !Array.isArray(mumlar) || mumlar.length < 4) return o;
+    var kap = mumlar.slice(-4, -1).map(function (m) { return { o: Number(m.open), h: Number(m.high), l: Number(m.low), c: Number(m.close) }; });
+    if (kap.some(function (m) { return !(sayi(m.o) && sayi(m.h) && sayi(m.l) && sayi(m.c)); })) return o;
+    var alt = Math.min(plan.giris[0], plan.giris[1]), ust = Math.max(plan.giris[0], plan.giris[1]), lng = plan.yon !== 'short';
+    var son = kap[kap.length - 1];
+    var degdi = kap.some(function (m) { return lng ? m.l <= ust : m.h >= alt; });
+    if (lng ? son.c < alt : son.c > ust) return { durum: 'yok', sebep: '1S kapanış bölgenin ' + (lng ? 'altında' : 'üstünde') };
+    if (!degdi) return { durum: 'bekliyor', sebep: '1S mum bölgeye değmedi' };
+    if (lng ? son.c >= plan.tp1 : son.c <= plan.tp1) return { durum: 'bekliyor', sebep: 'fiyat Hedef 1\'e vardı' };
+    if (lng ? son.c > son.o : son.c < son.o) return { durum: 'onay', sebep: '1S mum bölgeden ' + (lng ? 'yukarı' : 'aşağı') + ' kapandı' };
+    return { durum: 'bekliyor', sebep: '1S mum ' + (lng ? 'yukarı' : 'aşağı') + ' kapanmadı' };
   }
 
   // "12 Eki 08:00" -> kaç saat önce (yıl yazılmadığı için ileri tarih bir önceki yıl sayılır). Okunamazsa null.
@@ -73,8 +105,11 @@
     if (c.planHatali) { o.neden = 'Plan verisi hatalı'; return o; }
     if (!p) { o.neden = c.durum === 'uzak' ? 'Analiz: uzak dur' : 'İşlem planı yok'; return o; }
     var yon = p.yon === 'short' ? 'short' : 'long', tf = c.tf || {}, g = girisDurumu(p, c.fiyat);
-    var sn = planSinif(c), h = planHesap(p, sn.riskYuzde);
+    var sn = planSinif(c, piyasa), h = planHesap(p, sn.riskYuzde);
     o.yon = yon; o.g = g; o.sinif = sn.sinif; o.riskYuzde = sn.riskYuzde; o.h = h;
+    o.dominans = dominansEngeli(c.coin, yon, piyasa);
+    // 1S: sunucunun canlı hesapladığı değer (c.h1Canli) analizdeki sabit değerin önüne geçer
+    var h1 = c.h1Canli || tf.h1; o.h1 = h1;
     if (c.durum === 'uzak') { o.neden = 'Analiz: uzak dur'; return o; }
     if (g && g.tur === 'gecti' && (yon === 'short' ? c.fiyat >= p.stop : c.fiyat <= p.stop)) { o.neden = 'Fiyat stopun ötesinde · plan geçersiz'; return o; }
     // Teknik
@@ -83,7 +118,7 @@
     if (tf.d === TERS[yon]) tek.push('1G ters yönde');
     if (tf.h4 === TERS[yon]) tek.push('4S ters yönde');
     else if (tf.h4 !== AYNI[yon]) tek.push('4S plan yönünde değil');
-    if (sn.sinif === 'B' ? tf.h1 !== 'onay' : tf.h1 !== 'onay' && tf.h1 !== AYNI[yon]) tek.push('1S onayı yok');
+    if (sn.sinif === 'B' ? h1 !== 'onay' : h1 !== 'onay' && h1 !== AYNI[yon]) tek.push('1S onayı yok');
     if (h.r1Net < 1.5 - 1e-9) tek.push('ücret sonrası kazanç/risk ' + (Math.floor(h.r1Net * 100) / 100).toFixed(2).replace('.', ',') + ' (en az 1,5)');
     if (!h.kalUygun) tek.push('5x sınırında stop çok yakın');
     if (ek && typeof ek.analizSaat === 'number' && ek.analizSaat > ESKI_SAAT) tek.push('analiz ' + Math.floor(ek.analizSaat) + ' saat önce');
@@ -328,8 +363,9 @@
     else if (tf.d === 'yatay') skor += SKOR_AGIRLIK.d * 0.5;
     else o.eksik.push('1G ters');
     o.detay.d = tf.d;
-    if (tf.h1 === 'onay' || (k.sinif !== 'B' && tf.h1 === AYNI[yon])) skor += SKOR_AGIRLIK.h1; else o.eksik.push('1S onay yok');
-    o.detay.h1 = tf.h1;
+    var h1 = k.h1 || tf.h1;
+    if (h1 === 'onay' || (k.sinif !== 'B' && h1 === AYNI[yon])) skor += SKOR_AGIRLIK.h1; else o.eksik.push('1S onay yok');
+    o.detay.h1 = h1;
     var m15 = m15Zamanlama(c.m15, yon);
     skor += m15.puan * (SKOR_AGIRLIK.m15 / 3);
     o.detay.m15 = m15;
@@ -347,7 +383,9 @@
     if (haberTemiz) skor += SKOR_AGIRLIK.haber; else o.eksik.push('ters yönde yüksek haber');
     o.detay.haber = haberTemiz;
     var rejimOk = !(yon === 'long' && piyasa && piyasa.mod === 'Riskten kaçış') && !(yon === 'short' && piyasa && piyasa.mod === 'Risk açık');
-    if (rejimOk) skor += SKOR_AGIRLIK.rejim; else o.eksik.push('piyasa rejimi ters');
+    if (rejimOk && k.dominans) { rejimOk = false; o.eksik.push('dominance ters: ' + k.dominans); }
+    else if (!rejimOk) o.eksik.push('piyasa rejimi ters');
+    if (rejimOk) skor += SKOR_AGIRLIK.rejim;
     o.detay.rejim = piyasa && piyasa.mod;
     var g = k.g;
     if (g && g.tur === 'bolgede') skor += SKOR_AGIRLIK.fiyat;
@@ -360,7 +398,9 @@
     if (ek && typeof ek.analizSaat === 'number' && ek.analizSaat > ESKI_SAAT) { tavanB = true; o.eksik.push('analiz ' + Math.floor(ek.analizSaat) + ' saat önce'); }
     if (!h.kalUygun) { tavanB = true; o.eksik.push('5x sınırında stop çok yakın'); }
     if (g && g.tur === 'gecti') tavanB = true;
-    if (k.sinif === 'B' && tf.h1 !== 'onay') tavanB = true;
+    if (k.sinif === 'B' && h1 !== 'onay') tavanB = true;
+    // Tek kural: ekrandaki trafik ışığı yeşil değilse skor da sinyal (A/A+) vermez; bildirim ile ekran aynı şeyi söyler
+    if (k.renk !== 'yesil') tavanB = true;
     if (o.skor >= SKOR_ESIK.A_PLUS && !tavanB) { o.sinif = 'A+'; o.renk = 'yesil'; o.ad = 'Güçlü ' + (yon === 'long' ? 'LONG' : 'SHORT'); }
     else if (o.skor >= SKOR_ESIK.A && !tavanB) { o.sinif = 'A'; o.renk = 'yesil'; o.ad = (yon === 'long' ? 'LONG' : 'SHORT') + ' sinyali'; }
     else if (o.skor >= SKOR_ESIK.B) { o.sinif = 'B'; o.renk = 'sari'; o.ad = 'Zayıf sinyal · bekle'; }
@@ -500,6 +540,6 @@
     return o;
   }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT, haberSentiment: haberSentiment, haberTazelik: haberTazelik, sinyalSkoruHaber: sinyalSkoruHaber, HABER_AGIRLIK: HABER_AGIRLIK };
+  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, dominansEngeli: dominansEngeli, h1Onay: h1Onay, ESKI_SAAT: ESKI_SAAT, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT, haberSentiment: haberSentiment, haberTazelik: haberTazelik, sinyalSkoruHaber: sinyalSkoruHaber, HABER_AGIRLIK: HABER_AGIRLIK };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
