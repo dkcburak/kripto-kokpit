@@ -6,6 +6,16 @@ var DKC_ONBELLEK = 'dkc-kabuk-v12';
 var DKC_DOSYALAR = ['./', 'index.html', 'app.css?v=12', 'app.js?v=12', 'hesap.js?v=12', 'canli.js?v=12', 'bildirim.js?v=12', 'ornek.js?v=12', 'ayar.js',
   'lib/lightweight-charts-4.2.0.js', 'manifest.webmanifest', 'ikon.svg', 'ikon-180.png', 'ikon-192.png'];
 
+// dKc sinyal bildirimi (bildirim.js showNotification): dokununca coin sayfası açılır. OneSignal bildirimlerine karışmaz.
+self.addEventListener('notificationclick', function (e) {
+  var d = e.notification && e.notification.data;
+  if (!d || !d.dkc || !d.url) return;
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (l) {
+    for (var i = 0; i < l.length; i++) if (l[i].url.indexOf(self.registration.scope) === 0 && 'focus' in l[i]) { l[i].navigate(d.url).catch(function () {}); return l[i].focus(); }
+    return self.clients.openWindow(d.url);
+  }));
+});
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(DKC_ONBELLEK).then(function (c) { return c.addAll(DKC_DOSYALAR); }).catch(function () { /* biri eksikse kurulum yine sürer */ }));
 });
