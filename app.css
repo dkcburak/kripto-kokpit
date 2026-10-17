@@ -441,3 +441,7 @@ details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
 .sinyal-ozet a{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;background:var(--yuzey2);color:var(--yazi);text-decoration:none;font-size:12.5px}
 .sinyal-ozet a b{font-family:var(--f-baslik)}
 .pk-ust:has(.skor-rozet){flex-wrap:wrap;row-gap:6px}
+.karne{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:10px 12px;margin-bottom:12px;background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);font-size:13px;color:var(--sonuk)}
+.karne-baslik{font:600 14px var(--f-baslik);color:var(--yazi);width:100%}
+.karne .kv b{color:var(--yazi);font-weight:700} .karne .kv[style] b{color:inherit}
+.karne .kv{white-space:nowrap}

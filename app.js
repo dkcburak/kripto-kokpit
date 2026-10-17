@@ -208,8 +208,33 @@
     var renk = p.mod === 'Risk açık' ? 'var(--long)' : p.mod === 'Riskten kaçış' ? 'var(--short)' : 'var(--bekle)';
     return '<details class="piyasa"><summary><span class="mod"><span class="isik" style="background:' + renk + '"></span>Piyasa: ' + esc(p.mod) + '</span>' +
       (p.btc ? '<span class="kv">BTC <b>' + esc(p.btc) + '</b></span>' : '') +
-      (p.korku ? '<span class="kv">Korku/Açgözlülük <b>' + esc(p.korku.deger) + '</b></span>' : '') + '</summary>' +
+      (p.korku ? '<span class="kv">Korku/Açgözlülük <b>' + esc(p.korku.deger) + '</b></span>' : '') + dominansHtml(p.dominans) + '</summary>' +
       (p.not ? '<p>' + esc(p.not) + '</p>' : '') + '</details>';
+  }
+  // Dominance (analiz yazar): değer + 4 saatlik yön oku. USDT.D yükselişi long, BTC.D yükselişi altcoin long aleyhine.
+  var DOM_OK = { yukari: '↑', asagi: '↓', yatay: '→' };
+  function dominansHtml(dm) {
+    if (!dm || typeof dm !== 'object') return '';
+    return [['btc', 'BTC.D'], ['usdt', 'USDT.D']].map(function (x) {
+      var d = dm[x[0]]; if (!d || typeof d.deger !== 'number') return '';
+      var ters = d.h4 === 'yukari', renk = ters ? ' style="color:var(--short)"' : d.h4 === 'asagi' ? ' style="color:var(--long)"' : '';
+      return '<span class="kv" title="' + x[1] + ' 4 saatlik yön: ' + esc(YON[d.h4] ? YON[d.h4][0] : '–') + '">' + x[1] + ' <b' + renk + '>%' + f(d.deger, 2) + ' ' + (DOM_OK[d.h4] || '') + '</b></span>';
+    }).join('');
+  }
+  // Plan karnesi (sunucu, son 7 gün): yayınlanan planlar bölgeye geldi mi, önce Hedef 1 mi stop mu
+  function karneHtml(k) {
+    if (!k || !k.plan) return '';
+    var parca = function (sayi, ad, renk) { return '<span class="kv"' + (renk ? ' style="color:' + renk + '"' : '') + '><b>' + sayi + '</b> ' + ad + '</span>'; };
+    return '<section class="karne" aria-label="Plan karnesi"><span class="karne-baslik">Plan karnesi · ' + k.gun + ' gün</span>' +
+      parca(k.plan, 'plan') + parca(k.tp1, 'Hedef 1', 'var(--long)') + parca(k.stop, 'stop', 'var(--short)') + parca(k.girdi, 'açık') +
+      parca(k.gelmedi + k.bekliyor, 'girişe gelmedi') + (k.iptal ? parca(k.iptal, 'girişten önce stop') : '') +
+      '<span class="kv">İsabet <b>' + (k.isabet == null ? '–' : '%' + k.isabet) + '</b></span>' +
+      (k.sinyal ? '<span class="kv">dKc sinyali <b>' + k.sinyal + '</b> (' + k.sinyalTp1 + ' Hedef 1, ' + k.sinyalStop + ' stop)</span>' : '') + '</section>';
+  }
+  // Canlı 1S (sunucu, fiyat bölgedeyken) analizdeki sabit 1S değerinin yerine gösterilir
+  function tfCanli(c) {
+    var tf = c.tf || {}; if (!c.h1Canli) return tf;
+    var o = {}; for (var k in tf) o[k] = tf[k]; o.h1 = c.h1Canli; return o;
   }
   function satirHtml(c, d) {
     return '<a class="cs" href="#/coin/' + encodeURIComponent(c.coin) + '"><span class="cs-serit" style="background:' + d.renk + '"></span>' +
@@ -240,7 +265,7 @@
         (l.length ? '<div class="cs-liste">' + l.map(function (x) { return satirHtml(x[0], x[1]); }).join('') + '</div>' : (bos ? '<p class="bos">' + bos + '</p>' : '')) + '</section>';
     };
     var cipler = [['hepsi', 'Tümü'], ['favori', 'Favoriler'], ['degisen', 'En çok değişen']];
-    return bantlar() + aktifSinyallerHtml() + kutucuklar() + piyasaHtml(durum.veri.piyasa) +
+    return bantlar() + aktifSinyallerHtml() + kutucuklar() + piyasaHtml(durum.veri.piyasa) + karneHtml(durum.veri.karne) +
       '<div class="cipler" role="group" aria-label="Liste seçenekleri">' + cipler.map(function (x) { return '<button data-filtre="' + x[0] + '" aria-pressed="' + (durum.filtre === x[0]) + '">' + x[1] + '</button>'; }).join('') +
       '<button class="cip-ara" data-ara-ac aria-label="Coin ara" aria-expanded="' + durum.araAcik + '">' + ARA_IKON + '</button></div>' +
       (durum.araAcik ? '<input id="ara" class="ara-kutu" type="search" placeholder="Coin ara (ör. SOL)" autocomplete="off" aria-label="Coin ara" value="' + esc(durum.ara) + '">' : '') +
@@ -322,7 +347,7 @@
         var d = coinDurumu(c);
         return '<tr data-git="#/coin/' + encodeURIComponent(c.coin) + '"><td><a href="#/coin/' + encodeURIComponent(c.coin) + '" class="t-coin"><span class="rozet kucuk">' + esc(c.coin.slice(0, 4)) + '</span>' + esc(c.coin) + (favoriMi(c.coin) ? ' <span class="cs-yildiz">' + YILDIZ + '</span>' : '') + '</a></td>' +
           '<td class="sayi sag-h"' + cf(c) + '>' + f(c.fiyat) + '</td><td class="sayi sag-h ' + (c.deg24 >= 0 ? 'art' : 'eks') + '"' + cd(c) + '>' + degisim(c.deg24) + '</td>' +
-          '<td>' + durumRozet(d) + '</td><td>' + sinyalNoktalari(c.tf) + '</td>' +
+          '<td>' + durumRozet(d) + '</td><td>' + sinyalNoktalari(tfCanli(c)) + '</td>' +
           '<td class="t-durum ' + d.yaziRenk + '">' + (d.grup !== 'islem' && d.grup !== 'uzak' && d.k.yon ? yonRozet(d.k.yon, true) + ' ' : '') + esc(d.not || d.yazi) + '</td>' +
           '<td class="t-ozet">' + esc(c.ozet || c.islemYok || '') + '</td></tr>';
       }).join('') + '</tbody></table>' + (liste.length ? '' : '<p class="bos">Eşleşen coin yok.</p>') +
@@ -336,7 +361,7 @@
     haberler.sort(function (a, b) { return (etkiSira[a.h.etki] == null ? 3 : etkiSira[a.h.etki]) - (etkiSira[b.h.etki] == null ? 3 : etkiSira[b.h.etki]); });
     var haber = '<section class="blok"><h2>Haber akışı</h2>' + (haberler.length ? haberler.slice(0, 6).map(function (x) { return haberSatir(x.h, x.coin); }).join('') : '<p class="bos">Son 24 saatte önemli haber yok.</p>') + '</section>';
 
-    return bantlar() + aktifSinyallerHtml() + piyasaHtml(v.piyasa) + kutular + islemler + planlar + tablo + '<div class="masa-iki">' + alarmlar + haber + '</div>' + uyari();
+    return bantlar() + aktifSinyallerHtml() + piyasaHtml(v.piyasa) + karneHtml(v.karne) + kutular + islemler + planlar + tablo + '<div class="masa-iki">' + alarmlar + haber + '</div>' + uyari();
   }
   function haberSatir(h, coin) {
     var url = H.guvenliUrl(h.url), baslik = (coin ? '<span class="h-coin">' + esc(coin) + '</span>' : '') + esc(h.baslik);
@@ -479,7 +504,9 @@
         (c.funding != null ? '<dt>Funding (8 saat)</dt><dd class="sayi">%' + f(c.funding * 100, 4) + '</dd>' : '') +
         '</dl>' + (p.gecersiz ? '<p class="plan-not">' + esc(p.gecersiz) + '</p>' : '');
     }
-    return '<section class="blok karar karar-' + k.renk + '"><h2 class="karar-baslik">Koşullar</h2>' + govde + (c.ozet ? '<p class="karar-ozet">' + esc(c.ozet) + '</p>' : '') + tfSatir(c.tf) + plan +
+    return '<section class="blok karar karar-' + k.renk + '"><h2 class="karar-baslik">Koşullar</h2>' + govde + (c.ozet ? '<p class="karar-ozet">' + esc(c.ozet) + '</p>' : '') + tfSatir(tfCanli(c)) +
+      (c.h1Canli ? '<p class="karar-ozet">1 saat (canlı): ' + esc(c.h1Sebep || YON[c.h1Canli][0]) + '</p>' : '') +
+      (k.dominans ? '<p class="karar-ozet">Dominance: ' + esc(k.dominans) + '. Plan en fazla B sınıfı: risk %0,5, girişte 1S onayı şart.</p>' : '') + plan +
       '<p class="karar-not">Emir değildir; analiz planının koşul durumunu gösterir. Kararı siz verirsiniz. Analiz: ' + esc(durum.veri.analizZamani || '–') + '.</p></section>';
   }
   // ---------- Sinyal skoru (haber dahil, bilgi amaçlı) ----------
