@@ -175,6 +175,9 @@
     return o;
   }
   // Tahmini likidasyon kümeleri (bilgi amaçlı; karara girmez).
+  // Her saatte açık pozisyon artışı yeni pozisyon sayılır; o saatin ortalama fiyatından,
+  // long/short hesap oranına göre bölünüp 10/25/50/100x kaldıraçta likidasyon fiyatı hesaplanır.
+  // Pozisyon azalınca tüm kümeler orantılı küçülür; fiyat bir kümeye değdiyse o küme silinir.
   var LIK_KALDIRAC = [[10, 0.35], [25, 0.3], [50, 0.2], [100, 0.15]], LIK_MM = 0.005;
   function likidasyonHesap(oiHist, mumlar, lsHist, fiyat) {
     if (!Array.isArray(oiHist) || !Array.isArray(mumlar) || oiHist.length < 3 || mumlar.length < 3) return null;
@@ -198,11 +201,13 @@
       }
       onceki = v; sonT = t;
     });
+    // son açık pozisyon kaydından sonraki mumlar da kümeleri siler
     mumlar.forEach(function (m) { if (Number(m[0]) >= sonT) kume.forEach(function (k) { if (k.yon === 'long' ? Number(m[3]) <= k.p : Number(m[2]) >= k.p) k.v = 0; }); });
     var son = mumlar[mumlar.length - 1];
     var f = Number(fiyat) > 0 ? Number(fiyat) : Number(son[4]);
     kume = kume.filter(function (k) { return k.v > 0 && (k.yon === 'long' ? k.p < f : k.p > f); });
     if (!kume.length) return null;
+    // Özet: fiyatın %0,5'lik dilimlerinde en yoğun küme, üstte (short likidasyonu) ve altta (long likidasyonu)
     var dilim = {}, en = { ust: null, alt: null };
     kume.forEach(function (k) { var d = Math.round(Math.log(k.p / f) / Math.log(1.005)); dilim[d] = (dilim[d] || 0) + k.v; });
     Object.keys(dilim).forEach(function (d) {
@@ -212,6 +217,7 @@
     });
     return { kume: kume, fiyat: f, ust: en.ust, alt: en.alt };
   }
+  // Grafik şeridi için: lo–hi aralığını n dilime böler, her dilimdeki tahmini tutar
   function likidasyonDilim(kume, lo, hi, n) {
     var d = []; for (var i = 0; i < n; i++) d.push(0);
     if (!(hi > lo) || !kume) return d;
@@ -225,7 +231,10 @@
   // ---- AĞIRLIKLI CONFLUENCE SKORU (Faz 1) ----
   // Mevcut karar() AND mantığını bozmaz; paralel çalışır.
   // Amaç: sinyal kalitesini puanlamak, eşik üstünde "sinyal var" demek.
-  // Kural: 4S ters yöndeyse veya fiyat stop ötesindeyse skor 0 (otomatik veto).
+  // Veto (skor 0): plan hatalı, analiz "uzak dur", fiyat stop ötesinde, 4S ters, plan sınıfı C (yayın yok).
+  // Tavan (en fazla B): analiz 12 saatten eski, 5x sınırında stop çok yakın, fiyat bölgenin stop tarafında,
+  // B sınıfı planda 1S onayı yok (karar() ile aynı kural).
+  // Funding verisi yoksa funding puanı verilmez. 15m verisi (c.m15) henüz sunucudan gelmiyor.
   var SKOR_AGIRLIK = {
     h4: 3, d: 2, h1: 2, m15: 2, rr: 2, funding: 1, haber: 2, rejim: 1, fiyat: 2
   };
@@ -256,13 +265,16 @@
 
   function sinyalSkoru(c, piyasa, ek) {
     var o = { skor: 0, maks: SKOR_MAX, sinif: 'yok', yon: null, renk: 'kirmizi', ad: 'Sinyal yok', veto: null, eksik: [], detay: {} };
-    if (!c || !c.plan) { o.eksik.push('plan yok'); return o; }
+    if (!c || !c.plan) { o.eksik.push(c && c.planHatali ? 'plan verisi hatalı' : 'plan yok'); return o; }
+    if (!planGecerli(c.plan)) { o.veto = 'Plan verisi hatalı'; o.eksik.push(o.veto); return o; }
     var k = karar(c, piyasa, ek);
     o.yon = k.yon || (c.plan.yon === 'short' ? 'short' : 'long');
     o.detay.karar = k;
     if (k.neden && k.neden.indexOf('stopun ötesinde') >= 0) { o.veto = 'Fiyat stopun ötesinde'; o.eksik.push(o.veto); return o; }
+    if (c.durum === 'uzak') { o.veto = 'Analiz: uzak dur'; o.eksik.push(o.veto); return o; }
     var yon = o.yon, tf = c.tf || {};
     if (tf.h4 === TERS[yon]) { o.veto = '4S ters yönde'; o.eksik.push(o.veto); return o; }
+    if (k.sinif === 'C') { o.veto = 'Plan sınıfı C (trend tersi) · yayın yok'; o.eksik.push(o.veto); return o; }
     var skor = 0;
     if (tf.h4 === AYNI[yon]) skor += SKOR_AGIRLIK.h4; else o.eksik.push('4S plan yönünde değil');
     o.detay.h4 = tf.h4;
@@ -270,19 +282,19 @@
     else if (tf.d === 'yatay') skor += SKOR_AGIRLIK.d * 0.5;
     else o.eksik.push('1G ters');
     o.detay.d = tf.d;
-    if (tf.h1 === 'onay' || tf.h1 === AYNI[yon]) skor += SKOR_AGIRLIK.h1; else o.eksik.push('1S onay yok');
+    if (tf.h1 === 'onay' || (k.sinif !== 'B' && tf.h1 === AYNI[yon])) skor += SKOR_AGIRLIK.h1; else o.eksik.push('1S onay yok');
     o.detay.h1 = tf.h1;
     var m15 = m15Zamanlama(c.m15, yon);
     skor += m15.puan * (SKOR_AGIRLIK.m15 / 3);
     o.detay.m15 = m15;
     if (m15.puan < 2) o.eksik.push('15m zamanlama zayıf: ' + m15.sebep);
     var h = k.h || planHesap(c.plan, (planSinif(c) || {}).riskYuzde);
-    if (h.r1Net >= 1.5) skor += SKOR_AGIRLIK.rr; else o.eksik.push('R:R ' + (Math.floor(h.r1Net * 100) / 100) + ' (< 1,5)');
+    if (h.r1Net >= 1.5 - 1e-9) skor += SKOR_AGIRLIK.rr; else o.eksik.push('R:R ' + (Math.floor(h.r1Net * 100) / 100).toFixed(2).replace('.', ',') + ' (< 1,5)');
     o.detay.rr = h.r1Net;
     if (typeof c.funding === 'number') {
       var fundingOk = yon === 'short' ? c.funding > -0.0003 : c.funding < 0.001;
       if (fundingOk) skor += SKOR_AGIRLIK.funding; else o.eksik.push('funding aşırı');
-    } else { skor += SKOR_AGIRLIK.funding; }
+    } else o.eksik.push('funding verisi yok');
     o.detay.funding = c.funding;
     var tersHaber = yon === 'long' ? 'Olumsuz' : 'Olumlu', haberTemiz = true;
     (c.haberler || []).forEach(function (hb) { if (hb && hb.etki === 'Yüksek' && hb.yon === tersHaber) haberTemiz = false; });
@@ -293,11 +305,18 @@
     o.detay.rejim = piyasa && piyasa.mod;
     var g = k.g;
     if (g && g.tur === 'bolgede') skor += SKOR_AGIRLIK.fiyat;
-    else if (g && g.tur === 'uzak') o.eksik.push('fiyat girişe uzak (%' + (Math.round(g.girise * 10) / 10) + ')');
+    else if (g && g.tur === 'uzak') o.eksik.push('fiyat girişe uzak (%' + (Math.round(g.girise * 10) / 10).toString().replace('.', ',') + ')');
+    else if (g && g.tur === 'gecti') o.eksik.push('fiyat bölgenin ' + (yon === 'short' ? 'üstünde' : 'altında'));
+    else o.eksik.push('fiyat yok');
     o.detay.fiyat = g && g.tur;
     o.skor = Math.round(skor * 10) / 10;
-    if (o.skor >= SKOR_ESIK.A_PLUS) { o.sinif = 'A+'; o.renk = 'yesil'; o.ad = 'Güçlü ' + (yon === 'long' ? 'LONG' : 'SHORT'); }
-    else if (o.skor >= SKOR_ESIK.A) { o.sinif = 'A'; o.renk = 'yesil'; o.ad = (yon === 'long' ? 'LONG' : 'SHORT') + ' sinyali'; }
+    var tavanB = false;
+    if (ek && typeof ek.analizSaat === 'number' && ek.analizSaat > ESKI_SAAT) { tavanB = true; o.eksik.push('analiz ' + Math.floor(ek.analizSaat) + ' saat önce'); }
+    if (!h.kalUygun) { tavanB = true; o.eksik.push('5x sınırında stop çok yakın'); }
+    if (g && g.tur === 'gecti') tavanB = true;
+    if (k.sinif === 'B' && tf.h1 !== 'onay') tavanB = true;
+    if (o.skor >= SKOR_ESIK.A_PLUS && !tavanB) { o.sinif = 'A+'; o.renk = 'yesil'; o.ad = 'Güçlü ' + (yon === 'long' ? 'LONG' : 'SHORT'); }
+    else if (o.skor >= SKOR_ESIK.A && !tavanB) { o.sinif = 'A'; o.renk = 'yesil'; o.ad = (yon === 'long' ? 'LONG' : 'SHORT') + ' sinyali'; }
     else if (o.skor >= SKOR_ESIK.B) { o.sinif = 'B'; o.renk = 'sari'; o.ad = 'Zayıf sinyal · bekle'; }
     else { o.sinif = 'yok'; o.renk = 'kirmizi'; o.ad = 'Sinyal yok'; }
     return o;
