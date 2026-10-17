@@ -2,8 +2,8 @@ importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 // dKc: internetsiz açılış. Önce ağ (güncel sürüm hep gelir), ağ yoksa son kaydedilen kopya.
 // Yalnızca bu sitenin dosyaları; veri servisi ve MEXC istekleri önbelleğe alınmaz.
-var DKC_ONBELLEK = 'dkc-kabuk-v12';
-var DKC_DOSYALAR = ['./', 'index.html', 'app.css?v=12', 'app.js?v=12', 'hesap.js?v=12', 'canli.js?v=12', 'bildirim.js?v=12', 'ornek.js?v=12', 'ayar.js',
+var DKC_ONBELLEK = 'dkc-kabuk-v13';
+var DKC_DOSYALAR = ['./', 'index.html', 'app.css?v=13', 'app.js?v=13', 'hesap.js?v=13', 'canli.js?v=13', 'bildirim.js?v=13', 'ornek.js?v=13', 'ayar.js',
   'lib/lightweight-charts-4.2.0.js', 'manifest.webmanifest', 'ikon.svg', 'ikon-180.png', 'ikon-192.png'];
 
 // dKc sinyal bildirimi (bildirim.js showNotification): dokununca coin sayfası açılır. OneSignal bildirimlerine karışmaz.
