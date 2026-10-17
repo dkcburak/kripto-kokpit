@@ -173,4 +173,51 @@ t('sinyalSkoru hatalı: veto ve tavan', function () {
   assert.strictEqual(H.m15Zamanlama(null, 'long').puan, 0);
   assert.strictEqual(H.m15Zamanlama({ rsi: 80, ema9: 1, ema21: 2, hacim: 1, hacimOrt: 2 }, 'long').puan, 0);
 });
+// ATR hesaplama testi (Burak'ın örneği): her mumda TR = 4
+t('atrHesap', function () {
+  var mumlar = [], fiyat = 100;
+  for (var i = 0; i < 30; i++) { mumlar.push({ time: i * 900, open: fiyat, high: fiyat + 2, low: fiyat - 2, close: fiyat + 0.5, vol: 1000 }); fiyat += 0.5; }
+  assert(Math.abs(H.atrHesap(mumlar, 7) - 4) < 1e-9);
+  assert(Math.abs(H.atrHesap(mumlar) - 4) < 1e-9); // varsayılan periyot 7
+  assert.strictEqual(H.atrHesap(mumlar.slice(0, 7), 7), null); // 8 mumdan az
+  assert.strictEqual(H.atrHesap(null, 7), null);
+  assert.strictEqual(H.trSeri(mumlar)[0], null);
+});
+t('atrStopTp başarılı: ATR stopu sıkı, plan kurala uyar', function () {
+  // Burak'ın örneği: ATR 4 -> ATR stopu 95, analiz stopu ile aynı, korunur
+  var a = H.atrStopTp({ yon: 'long', giris: [100, 102], stop: 95, tp1: 110, tp2: 115 }, 4, 101);
+  assert.strictEqual(a.kaynak, 'claude'); assert.strictEqual(a.stop, 95); assert.strictEqual(a.tp1, 110);
+  var P = { yon: 'long', giris: [80000, 80400], stop: 78800, tp1: 83000, tp2: 84500 };
+  a = H.atrStopTp(P, 300, 80200);
+  assert.strictEqual(a.kaynak, 'atr'); assert.strictEqual(a.stop, 79750);
+  var p2 = { yon: 'long', giris: P.giris, stop: a.stop, tp1: a.tp1, tp2: a.tp2 }, h = H.planHesap(p2);
+  assert(H.planGecerli(p2)); assert(h.r1Net >= 1.5 - 1e-9 && h.r1Net < 1.51); assert(h.kalUygun); // ücret sonrası 1,5R
+  // short: ATR stopu girişin üstünde, analiz stopundan aşağıda
+  var s = H.atrStopTp({ yon: 'short', giris: [100, 102], stop: 110, tp1: 90 }, 2, 101);
+  assert.strictEqual(s.kaynak, 'atr'); assert.strictEqual(s.stop, 104); assert(s.tp1 < 100 && s.tp2 <= s.tp1);
+  // düşük fiyatlı coin: yuvarlama değeri bozmaz
+  var pe = H.atrStopTp({ yon: 'long', giris: [0.0000100, 0.0000102], stop: 0.0000090, tp1: 0.0000130 }, 0.0000002, 0.0000101);
+  assert.strictEqual(pe.stop, 0.0000098); assert(pe.tp1 > 0.0000102);
+});
+t('atrStopTp hatalı: bölge içi, 5x sınırı, geçersiz girdi', function () {
+  var P = { yon: 'long', giris: [80000, 80400], stop: 78800, tp1: 83000, tp2: 84500 };
+  var a = H.atrStopTp(P, 80, 80200); // ATR stopu 80080: giriş bölgesinin içinde
+  assert.strictEqual(a.kaynak, 'claude'); assert.strictEqual(a.stop, 78800); assert(/bölgesinin içinde/.test(a.notlar[0]));
+  a = H.atrStopTp({ yon: 'long', giris: [80150, 80250], stop: 78800, tp1: 83000 }, 80, 80200); // ATR stopu 80080 (%0,15): %1 risk için 5x yetmez
+  assert.strictEqual(a.kaynak, 'claude'); assert(/5x/.test(a.notlar[0]));
+  assert.strictEqual(H.atrStopTp(P, 0, 80200), null);
+  assert.strictEqual(H.atrStopTp({ yon: 'long', giris: [100], stop: 95, tp1: 110 }, 4, 100), null);
+  assert.strictEqual(H.atrStopTp(null, 4, 100), null);
+});
+t('sinyalSkoruAtr: ayarlı planla baştan skor', function () {
+  var mum = [], f = 80200;
+  for (var i = 0; i < 30; i++) mum.push({ time: i * 900, open: f, high: f + 100, low: f - 100, close: f, vol: 1 }); // ATR 200
+  var c = { durum: 'long', fiyat: 80200, funding: 0.0001, plan: { yon: 'long', giris: [80000, 80400], stop: 78800, tp1: 83000 }, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' }, mumlar: mum };
+  var o = H.sinyalSkoruAtr(c, { mod: 'Temkinli' });
+  assert.strictEqual(o.atr.kaynak, 'atr'); assert.strictEqual(o.planAyarli.stop, 79900);
+  assert(o.detay.rr >= 1.5 - 1e-9); assert.strictEqual(o.skorOzgun, H.sinyalSkoru(c, { mod: 'Temkinli' }).skor);
+  assert.strictEqual(c.plan.stop, 78800); // asıl plan değişmez
+  delete c.mumlar; assert.strictEqual(H.sinyalSkoruAtr(c).atr, undefined);
+  c.mumlar = mum.slice(0, 5); assert.strictEqual(H.sinyalSkoruAtr(c).atrNot, 'ATR için yeterli mum yok');
+});
 console.log(n + ' test geçti');

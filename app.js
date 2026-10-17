@@ -76,7 +76,7 @@
     if (!AYAR.api) return Promise.resolve(window.KOKPIT_ORNEK_MUM(coin, tf, fiyat));
     var k = coin + '-' + tf;
     if (mumYolda[k]) return mumYolda[k];
-    mumYolda[k] = api({ f: 'mum', coin: coin, tf: tf }).then(function (j) { delete mumYolda[k]; if (j.mumlar && j.mumlar.length) mumSakla(coin, tf, j.mumlar); return j.mumlar; },
+    mumYolda[k] = api({ f: 'mum', coin: coin, tf: tf }).then(function (j) { delete mumYolda[k]; if (j.mumlar && j.mumlar.length) { mumSakla(coin, tf, j.mumlar); if (tf === 'm15' && CANLI && CANLI.m15Tohum) CANLI.m15Tohum(coin, j.mumlar); } return j.mumlar; },
       function (e) { delete mumYolda[k]; throw e; });
     return mumYolda[k];
   }
@@ -113,7 +113,7 @@
   }
 
   // ---------- Canlı fiyat (MEXC akışı) ----------
-  function canliUygula(c) { var l = CANLI && CANLI.fiyat(c.coin); if (l && isFinite(l.fiyat) && l.fiyat > 0) { c.fiyat = l.fiyat; c.deg24 = l.deg24; if (isFinite(l.funding)) c.funding = l.funding; } }
+  function canliUygula(c) { var l = CANLI && CANLI.fiyat(c.coin); if (l && isFinite(l.fiyat) && l.fiyat > 0) { c.fiyat = l.fiyat; c.deg24 = l.deg24; if (isFinite(l.funding)) c.funding = l.funding; } if (CANLI && CANLI.m15) c.m15 = CANLI.m15(c.coin); }
   var boyanacak = {}, boyaZaman = null, sonDetay = 0, sonGrup = 0;
   function canliBoya() {
     boyaZaman = null; var liste = Object.keys(boyanacak); boyanacak = {};
@@ -908,7 +908,7 @@
       cizildi = true; uzunluk = veri.length;
     }
     var eski = AYAR.api ? mumOnbellek(c.coin, tf) : null;
-    if (eski) { try { ciz(eski.m); } catch (x) { cizildi = false; } }
+    if (eski) { try { ciz(eski.m); } catch (x) { cizildi = false; } if (tf === 'm15' && CANLI && CANLI.m15Tohum) CANLI.m15Tohum(c.coin, eski.m); }
     if (!eski || Date.now() - eski.t >= 60000) mumYukle(c.coin, tf, c.fiyat).then(function (veri) {
       if (durum.grafik !== kayit) return; // bu sırada başka grafik açıldı: eski yanıtı at
       if (!veri || !veri.length) throw new Error('bos');

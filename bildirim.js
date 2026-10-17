@@ -20,7 +20,47 @@
     // Uygulama öne gelince yeni sürüm var mı diye bakılır
     document.addEventListener('visibilitychange', function () { if (!document.hidden) navigator.serviceWorker.getRegistration(kapsam).then(function (r) { if (r) r.update().catch(function () {}); }).catch(function () {}); });
   }
+  // Sinyal bildirimi: A+/A sınıfı sinyal geldiğinde bu cihazda bildirim gösterir (uygulama açıkken).
+  // OneSignal v16'da sendSelfNotification yok; bildirim servis çalışanından (showNotification) gösterilir.
+  // veri: { coin, yon, sinif, skor, maks, giris, stop, tp1 } (sayılar app.js'te biçimlenmiş metin)
+  // Aynı coin+yon+sinif için 30 dk içinde tekrar göndermez (spam engeli, localStorage "bildirilenSinyaller").
+  var SINYAL_ANAHTAR = 'bildirilenSinyaller', SINYAL_ARA = 30 * 60 * 1000, SINYAL_SAKLA = 7 * 24 * 60 * 60 * 1000;
+  function sinyalBildir(veri) {
+    if (!veri || !veri.coin || !veri.yon) return Promise.resolve(false);
+    if (veri.sinif !== 'A+' && veri.sinif !== 'A') return Promise.resolve(false);
+    if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return Promise.resolve(false);
+    var kayit = {};
+    try { kayit = JSON.parse(localStorage.getItem(SINYAL_ANAHTAR) || '{}') || {}; } catch (e) { kayit = {}; }
+    var imza = veri.coin + '_' + veri.yon + '_' + veri.sinif, simdi = Date.now();
+    if (kayit[imza] && simdi - kayit[imza] < SINYAL_ARA) return Promise.resolve(false); // 30 dk dolmadı
+    kayit[imza] = simdi;
+    // 7 günden eski kayıtları temizle
+    Object.keys(kayit).forEach(function (k) { if (!(simdi - kayit[k] <= SINYAL_SAKLA)) delete kayit[k]; });
+    try { localStorage.setItem(SINYAL_ANAHTAR, JSON.stringify(kayit)); } catch (e) { /* yok say */ }
+    var baslik = (veri.sinif === 'A+' ? '🔥 ' : '⚡ ') + veri.coin + ' ' + (veri.yon === 'short' ? 'SHORT' : 'LONG') + ' sinyali';
+    var govde = (veri.sinif === 'A+' ? 'Güçlü sinyal' : 'Sinyal') + ' · Skor ' + veri.skor + '/' + (veri.maks || 17);
+    if (veri.giris) govde += ' · Giriş: ' + veri.giris;
+    if (veri.stop) govde += ' · Stop: ' + veri.stop;
+    if (veri.tp1) govde += ' · TP1: ' + veri.tp1;
+    var kapsam = location.pathname.replace(/[^/]*$/, '');
+    return navigator.serviceWorker.getRegistration(kapsam).then(function (r) {
+      if (!r) throw new Error('Servis çalışanı yok');
+      return r.showNotification(baslik, { body: govde, tag: 'sinyal-' + imza, icon: kapsam + 'ikon-192.png', data: { dkc: true, url: location.origin + kapsam + '#/coin/' + encodeURIComponent(veri.coin) } });
+    }).then(function () { return true; }, function (e) {
+      // gösterilemediyse kayıt geri alınır; bir sonraki denemede yeniden dener
+      try { var k2 = JSON.parse(localStorage.getItem(SINYAL_ANAHTAR) || '{}') || {}; delete k2[imza]; localStorage.setItem(SINYAL_ANAHTAR, JSON.stringify(k2)); } catch (x) { /* yok say */ }
+      if (window.console) console.error('Sinyal bildirimi gösterilemedi:', e);
+      return false;
+    });
+  }
+  // Bildirilen sinyalleri sıfırla (test için)
+  function sinyalBildirimSifirla() {
+    try { localStorage.removeItem(SINYAL_ANAHTAR); } catch (e) { /* yok say */ }
+  }
+
   window.KOKPIT_BILDIRIM = {
+    sinyalBildir: sinyalBildir,
+    sinyalBildirimSifirla: sinyalBildirimSifirla,
     durum: function () {
       if (!AYAR.onesignalAppId) return 'kurulmadi';
       if (!('Notification' in window) || (ios && !anaEkranda)) return 'desteklenmiyor';
@@ -42,4 +82,5 @@
       });
     }
   };
+  window.DKC_BILDIRIM = window.KOKPIT_BILDIRIM; // kısa ad (konsol testi için)
 })();
