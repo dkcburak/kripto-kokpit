@@ -322,6 +322,107 @@
     return o;
   }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK };
+  // ---- ATR BAZLI DİNAMİK STOP/TP (Faz 1) ----
+  // Amaç: volatilite değişince stop/TP'yi uyarla. Analizin stop'u TAVAN/TABAN'dır;
+  // ATR stop'u analizin stop'undan geniş olamaz, yalnızca daraltabilir.
+  // Daraltılmış plan da kurala uymalı: stop giriş bölgesinin dışında, 5x içinde; aksi halde analizin stop'u kalır.
+  // Bilgi amaçlı; karar() ve plan değişmez. Backtest yapılmadı.
+  var ATR_PERIYOT = 7;           // 15m için hızlı ATR
+  var ATR_STOP_CARPAN = 1.5;     // stop = giriş ± ATR * 1.5
+  var ATR_TP1_R = 1.5;           // TP1: ücret sonrası kazanç/risk 1,5 (karar() eşiği)
+  var ATR_TP2_R = 2.5;           // TP2: ücret sonrası kazanç/risk 2,5
+
+  // Fiyata göre 8 anlamlı basamak (düşük fiyatlı coinde 1e6 yuvarlama değeri bozardı)
+  function anlamli(x) { return Number(x.toPrecision(8)); }
+
+  // True Range serisi: mum listesi -> TR listesi (ilk eleman null)
+  // mum: [{ time, open, high, low, close, vol }, ...]
+  function trSeri(mumlar) {
+    var out = mumlar.map(function () { return null; });
+    for (var i = 1; i < mumlar.length; i++) {
+      var m = mumlar[i], onceki = mumlar[i - 1];
+      var tr = Math.max(
+        m.high - m.low,
+        Math.abs(m.high - onceki.close),
+        Math.abs(m.low - onceki.close)
+      );
+      out[i] = isFinite(tr) ? tr : null;
+    }
+    return out;
+  }
+
+  // Wilder ATR: ilk n TR'nin ortalaması, sonra (önceki * (n-1) + TR) / n
+  // mumlar: [{ high, low, close }, ...], n: periyot (varsayılan ATR_PERIYOT)
+  function atrHesap(mumlar, n) {
+    n = n || ATR_PERIYOT;
+    if (!Array.isArray(mumlar) || mumlar.length < n + 1) return null;
+    var tr = trSeri(mumlar);
+    var atr = 0, sayac = 0;
+    for (var i = 1; i < tr.length; i++) {
+      if (tr[i] == null) continue;
+      if (sayac < n) { atr += tr[i]; sayac++; if (sayac === n) atr /= n; }
+      else { atr = (atr * (n - 1) + tr[i]) / n; }
+    }
+    return sayac >= n ? atr : null;
+  }
+
+  // Ücret sonrası kazanç/risk = r olacak hedef uzaklığı (planHesap r1Net formülünün tersi)
+  function netHedefMesafe(risk, giris, r) { var u = UCRET * giris; return r * (risk + u) + u; }
+
+  // ATR bazlı stop/TP önerisi. Analizin planıyla karşılaştırıp daha sıkı stop'u seçer.
+  // plan: { yon, giris, stop, tp1, tp2 }, atr: sayı, fiyat: güncel fiyat (bilgi)
+  // Dönüş: { stop, tp1, tp2, atr, stopYuzde, kaynak: 'claude' | 'atr', notlar: [] } ya da null
+  function atrStopTp(plan, atr, fiyat) {
+    if (!planGecerli(plan) || !sayi(atr)) return null;
+    var yon = plan.yon === 'short' ? 'short' : 'long', lng = yon === 'long';
+    var alt = Math.min(plan.giris[0], plan.giris[1]), ust = Math.max(plan.giris[0], plan.giris[1]);
+    var giris = (alt + ust) / 2;
+    var notlar = [], kaynak = 'claude', stop = plan.stop;
+    var atrStop = lng ? giris - atr * ATR_STOP_CARPAN : giris + atr * ATR_STOP_CARPAN;
+    if (lng ? atrStop <= plan.stop : atrStop >= plan.stop) notlar.push('Analiz stopu daha sıkı, korundu');
+    else if (lng ? atrStop >= alt : atrStop <= ust) notlar.push('ATR stopu giriş bölgesinin içinde kalıyor, analiz stopu korundu');
+    else if (!planHesap({ yon: yon, giris: plan.giris, stop: atrStop, tp1: plan.tp1 }).kalUygun) notlar.push('ATR stopu 5x sınırı için çok yakın, analiz stopu korundu');
+    else { stop = atrStop; kaynak = 'atr'; notlar.push('ATR stopu analiz stopundan sıkı'); }
+    // TP'ler: ücret sonrası 1,5R ve 2,5R; analizin hedefi daha yakınsa o korunur (bölgenin dışında kalmak şartıyla)
+    var risk = Math.abs(giris - stop);
+    var atrTp1 = lng ? giris + netHedefMesafe(risk, giris, ATR_TP1_R) : giris - netHedefMesafe(risk, giris, ATR_TP1_R);
+    var atrTp2 = lng ? giris + netHedefMesafe(risk, giris, ATR_TP2_R) : giris - netHedefMesafe(risk, giris, ATR_TP2_R);
+    var tp1 = lng ? Math.min(plan.tp1, atrTp1) : Math.max(plan.tp1, atrTp1);
+    var tp2 = plan.tp2 ? (lng ? Math.min(plan.tp2, atrTp2) : Math.max(plan.tp2, atrTp2)) : atrTp2;
+    if (lng ? tp1 <= ust : tp1 >= alt) { tp1 = plan.tp1; notlar.push('ATR hedefi giriş bölgesinde, analiz hedefi korundu'); }
+    if (lng ? tp2 < tp1 : tp2 > tp1) tp2 = tp1;
+    if (tp1 !== plan.tp1) notlar.push('Hedef 1 ATR stopuna göre yakınlaştı');
+    return {
+      stop: anlamli(stop),
+      tp1: anlamli(tp1),
+      tp2: anlamli(tp2),
+      atr: anlamli(atr),
+      stopYuzde: Math.round(risk / giris * 10000) / 100,
+      kaynak: kaynak,
+      notlar: notlar
+    };
+  }
+
+  // Sinyal skoru, ATR ayarlı planla baştan hesaplanır (tüm kurallar ayarlı plana uygulanır)
+  // c.mumlar: 15m veya 1S mum listesi (henüz app.js doldurmuyor)
+  function sinyalSkoruAtr(c, piyasa, ek) {
+    var o = sinyalSkoru(c, piyasa, ek);
+    if (!c || !c.mumlar || !c.plan) return o;
+    var atr = atrHesap(c.mumlar, ATR_PERIYOT);
+    if (!atr) { o.atrNot = 'ATR için yeterli mum yok'; return o; }
+    var ayar = atrStopTp(c.plan, atr, c.fiyat);
+    if (!ayar) { o.atrNot = 'ATR stop/TP hesaplanamadı'; return o; }
+    var planAyarli = {}, k;
+    for (k in c.plan) planAyarli[k] = c.plan[k];
+    planAyarli.stop = ayar.stop; planAyarli.tp1 = ayar.tp1; planAyarli.tp2 = ayar.tp2;
+    var c2 = {};
+    for (k in c) c2[k] = c[k];
+    c2.plan = planAyarli;
+    var o2 = sinyalSkoru(c2, piyasa, ek);
+    o2.atr = ayar; o2.planAyarli = planAyarli; o2.skorOzgun = o.skor; o2.sinifOzgun = o.sinif;
+    return o2;
+  }
+
+  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
