@@ -142,4 +142,35 @@ t('likidasyonHesap', function () {
   var b = H.likidasyonDilim(d.kume, 80, 120, 40); assert.strictEqual(b.length, 40); assert(b[10] > 0); // 90,5 → dilim 10
   assert.strictEqual(H.likidasyonHesap([], [], [], 1), null);
 });
+t('sinyalSkoru başarılı: tüm koşullar uygun -> A+', function () {
+  var P = { yon: 'long', giris: [100, 110], stop: 95, tp1: 140 }, m = { rsi: 50, ema9: 2, ema21: 1, hacim: 2, hacimOrt: 1 };
+  var c = { durum: 'long', fiyat: 105, funding: 0.0001, plan: P, m15: m, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' } };
+  var s = H.sinyalSkoru(c, { mod: 'Temkinli' }, { analizSaat: 2 });
+  assert.strictEqual(s.skor, 17); assert.strictEqual(s.sinif, 'A+'); assert.strictEqual(s.renk, 'yesil'); assert.strictEqual(s.veto, null);
+  assert.strictEqual(H.karar(c, { mod: 'Temkinli' }, { analizSaat: 2 }).renk, 'yesil');
+  // 15m verisi ve funding yoksa puan verilmez: 17 - 2 - 1 = 14, hâlâ A+
+  delete c.m15; delete c.funding; s = H.sinyalSkoru(c, { mod: 'Temkinli' });
+  assert.strictEqual(s.skor, 14); assert(s.eksik.indexOf('funding verisi yok') >= 0);
+  var w = H.SKOR_AGIRLIK, top = 0; for (var k in w) top += w[k]; assert.strictEqual(top, H.sinyalSkoru(c).maks);
+});
+t('sinyalSkoru hatalı: veto ve tavan', function () {
+  var P = { yon: 'long', giris: [100, 110], stop: 95, tp1: 140 }, tf = { d: 'yukari', h4: 'yukari', h1: 'onay' };
+  function sk(c, ek) { return H.sinyalSkoru(c, { mod: 'Temkinli' }, ek); }
+  // plan sınıfı C (1G ters) yayınlanmaz
+  var s = sk({ durum: 'long', fiyat: 105, plan: P, tf: { d: 'asagi', h4: 'yukari', h1: 'onay' } });
+  assert.strictEqual(s.skor, 0); assert(/sınıfı C/.test(s.veto));
+  assert.strictEqual(sk({ durum: 'uzak', fiyat: 105, plan: P, tf: tf }).veto, 'Analiz: uzak dur');
+  assert.strictEqual(sk({ durum: 'long', fiyat: 94, plan: P, tf: tf }).veto, 'Fiyat stopun ötesinde');
+  assert.strictEqual(sk({ durum: 'long', fiyat: 105, plan: P, tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } }).veto, '4S ters yönde');
+  assert.strictEqual(sk({ durum: 'long', fiyat: 105, plan: { yon: 'long', giris: 100 }, tf: tf }).veto, 'Plan verisi hatalı');
+  assert.strictEqual(sk(null).skor, 0);
+  // eski analiz: puan yüksek ama en fazla B
+  s = sk({ durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: tf }, { analizSaat: 13 });
+  assert(s.skor >= H.SKOR_ESIK.A); assert.strictEqual(s.sinif, 'B'); assert.strictEqual(s.renk, 'sari');
+  // B sınıfında 1S onayı yoksa yeşil olmaz
+  s = sk({ durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: { d: 'yatay', h4: 'yukari', h1: 'bekliyor' } });
+  assert.notStrictEqual(s.renk, 'yesil');
+  assert.strictEqual(H.m15Zamanlama(null, 'long').puan, 0);
+  assert.strictEqual(H.m15Zamanlama({ rsi: 80, ema9: 1, ema21: 2, hacim: 1, hacimOrt: 2 }, 'long').puan, 0);
+});
 console.log(n + ' test geçti');
