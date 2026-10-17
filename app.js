@@ -115,20 +115,11 @@
   // ---------- Canlı fiyat (MEXC akışı) ----------
   function canliUygula(c) { var l = CANLI && CANLI.fiyat(c.coin); if (l && isFinite(l.fiyat) && l.fiyat > 0) { c.fiyat = l.fiyat; c.deg24 = l.deg24; if (isFinite(l.funding)) c.funding = l.funding; } if (CANLI && CANLI.m15) c.m15 = CANLI.m15(c.coin); }
   var boyanacak = {}, boyaZaman = null, sonDetay = 0, sonGrup = 0;
-  // Sinyal bildirimi kontrolü: skor A+/A ve fiyat giriş bölgesindeyse (cooldown bildirim.js'te)
-  function sinyalKontrol(c) {
-    var B = window.DKC_BILDIRIM, v = durum.veri;
-    if (!B || !B.sinyalBildir || !H.sinyalSkoru || !c || !c.plan || B.durum() !== 'acik') return;
-    var skor = H.sinyalSkoru(c, v && v.piyasa, { analizSaat: H.analizYasi(v && v.analizZamani) });
-    if (!skor || (skor.sinif !== 'A+' && skor.sinif !== 'A') || skor.detay.fiyat !== 'bolgede') return;
-    var p = skor.planAyarli || c.plan;
-    B.sinyalBildir({ coin: c.coin, yon: skor.yon, sinif: skor.sinif, skor: f(skor.skor), maks: skor.maks, giris: f(p.giris[0]) + '–' + f(p.giris[1]), stop: f(p.stop), tp1: f(p.tp1) });
-  }
   function canliBoya() {
     boyaZaman = null; var liste = Object.keys(boyanacak); boyanacak = {};
     if (!durum.veri) return;
     liste.forEach(function (k) {
-      var c = coinBul(k); if (!c) return; canliUygula(c); sinyalKontrol(c);
+      var c = coinBul(k); if (!c) return; canliUygula(c);
       var ks = window.CSS && CSS.escape ? CSS.escape(k) : k;
       document.querySelectorAll('[data-cf="' + ks + '"]').forEach(function (el) { el.textContent = f(c.fiyat); });
       document.querySelectorAll('[data-cd="' + ks + '"]').forEach(function (el) { el.textContent = degisim(c.deg24); el.classList.toggle('art', c.deg24 >= 0); el.classList.toggle('eks', c.deg24 < 0); });
