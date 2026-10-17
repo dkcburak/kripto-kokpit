@@ -240,6 +240,8 @@
   };
   var SKOR_MAX = 17;
   var SKOR_ESIK = { A_PLUS: 14, A: 11, B: 8 };
+  // Haber sentiment ağırlığı (sinyalSkoruHaber içinde kullanılır)
+  var HABER_AGIRLIK = 2;
 
   function m15Zamanlama(m15, yon) {
     if (!m15 || typeof m15.rsi !== 'number') return { puan: 0, maks: 3, sebep: '15m verisi yok' };
@@ -261,6 +263,50 @@
     if (m15.hacim && m15.hacimOrt && m15.hacim > m15.hacimOrt * 1.1) { puan += 1; sebepler.push('15m hacim onaylı'); }
     else if (m15.hacim && m15.hacimOrt && m15.hacim < m15.hacimOrt * 0.7) sebepler.push('15m hacim zayıf');
     return { puan: Math.min(3, puan), maks: 3, sebep: sebepler.join(', ') };
+  }
+
+  // ---- HABER SENTIMENT SKORU (Faz 1) ----
+  // Her haberi -1 / 0 / +1 olarak puanlar. Toplam: -3 ile +3 arası.
+  // Etki: Yüksek = 1.0, Orta = 0.5, Düşük = 0.2
+  // Tazelik: 0-6 saat = 1.0, 6-24 saat = 0.7, 24-48 saat = 0.4, >48 saat = 0 (sayılmaz)
+  // Yön: Olumlu = +1, Olumsuz = -1, Nötr = 0
+  // Haber verisi: { yon: 'Olumlu'|'Olumsuz'|'Nötr', etki: 'Yüksek'|'Orta'|'Düşük', saat: kaç saat önce }
+  // saat yoksa analizdeki zaman metninden ("16 Eki 09:34") hesaplanır; o da okunamazsa haber tam sayılır.
+  var HABER_ETKI = { 'Yüksek': 1.0, 'Orta': 0.5, 'Düşük': 0.2 };
+  var HABER_YON = { 'Olumlu': 1, 'Olumsuz': -1, 'Nötr': 0 };
+
+  function haberTazelik(saat) {
+    if (typeof saat !== 'number' || !isFinite(saat) || saat < 0) return 1.0; // bilinmiyorsa tam say
+    if (saat <= 6) return 1.0;
+    if (saat <= 24) return 0.7;
+    if (saat <= 48) return 0.4;
+    return 0; // 48 saatten eski haber sayılmaz
+  }
+
+  // Haberleri puanla. Dönüş: { skor, sinyalYon, sayi, etkili, detay[] }
+  // skor: sinyal yönüne göre; pozitif = destekliyor, negatif = ters. simdi: test için (ms)
+  function haberSentiment(haberler, sinyalYon, simdi) {
+    var o = { skor: 0, sinyalYon: sinyalYon === 'short' ? 'short' : 'long', sayi: 0, etkili: 0, detay: [] };
+    if (!Array.isArray(haberler) || !haberler.length) return o;
+    var yonIsaret = o.sinyalYon === 'short' ? -1 : 1; // short'ta olumsuz haber destek sayılır
+    haberler.forEach(function (h) {
+      if (!h || typeof h !== 'object') return;
+      o.sayi++;
+      var etki = HABER_ETKI[h.etki];
+      if (etki == null) etki = 0.3; // bilinmeyen etki varsayılan
+      var yon = HABER_YON[h.yon];
+      if (yon == null) yon = 0;
+      var saat = typeof h.saat === 'number' ? h.saat : analizYasi(h.zaman, simdi);
+      var tazelik = haberTazelik(saat);
+      if (tazelik === 0) { o.detay.push({ yon: h.yon, etki: h.etki, saat: saat, puan: 0, not: '48 saatten eski, sayılmadı' }); return; }
+      var puan = yon * etki * tazelik * yonIsaret;
+      o.skor += puan;
+      if (Math.abs(puan) > 0.3) o.etkili++;
+      o.detay.push({ yon: h.yon, etki: h.etki, saat: saat, puan: Math.round(puan * 100) / 100 });
+    });
+    // -3 ile +3 arasına sıkıştır
+    o.skor = Math.round(Math.max(-3, Math.min(3, o.skor)) * 100) / 100;
+    return o;
   }
 
   function sinyalSkoru(c, piyasa, ek) {
@@ -423,6 +469,37 @@
     return o2;
   }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT };
+  // Haber sentiment katmanı: sinyalSkoru() sonucuna ±HABER_AGIRLIK puan ekler (bilgi amaçlı; karar() değişmez).
+  // sinyalSkoru()'nun vetoları ve "en fazla B" tavanı korunur; güçlü ters haber (≤ -2) veto eder.
+  // Not: sinyalSkoru zaten "ters yönde yüksek haber yok" için 2 puan veriyor; bu katman onun üstüne gelir (maks 19).
+  function sinyalSkoruHaber(c, piyasa, ek, simdi) {
+    var o = sinyalSkoru(c, piyasa, ek);
+    if (!c || !c.plan) return o;
+    var yon = o.yon || 'long';
+    var hs = haberSentiment(c.haberler, yon, simdi);
+    o.haber = hs;
+    o.detay.haberSkor = hs.skor;
+    o.skorHabersiz = o.skor;
+    o.maks = SKOR_MAX + HABER_AGIRLIK;
+    if (o.veto) return o; // vetolu sinyal haberle geri gelmez
+    if (hs.skor <= -2) {
+      o.veto = 'Güçlü ters haber (skor ' + String(hs.skor).replace('.', ',') + ')'; o.eksik.push(o.veto);
+      o.skor = 0; o.sinif = 'yok'; o.renk = 'kirmizi'; o.ad = 'Ters haber · bekle';
+      return o;
+    }
+    // Tavan: sinyalSkoru puanı A'ya yetip sınıfı B verdiyse (eski analiz, 5x, bölge geçildi, B'de 1S onayı yok) B kalır
+    var tavanB = o.sinif === 'B' && o.skor >= SKOR_ESIK.A;
+    // Haber katkısı: -3..+3 -> -HABER_AGIRLIK..+HABER_AGIRLIK
+    var katki = hs.skor * HABER_AGIRLIK / 3;
+    o.skor = Math.max(0, Math.round((o.skor + katki) * 10) / 10);
+    if (hs.skor < 0) o.eksik.push('haber akışı ters (' + String(hs.skor).replace('.', ',') + ')');
+    if (o.skor >= SKOR_ESIK.A_PLUS && !tavanB) { o.sinif = 'A+'; o.renk = 'yesil'; o.ad = 'Güçlü ' + (yon === 'long' ? 'LONG' : 'SHORT'); }
+    else if (o.skor >= SKOR_ESIK.A && !tavanB) { o.sinif = 'A'; o.renk = 'yesil'; o.ad = (yon === 'long' ? 'LONG' : 'SHORT') + ' sinyali'; }
+    else if (o.skor >= SKOR_ESIK.B) { o.sinif = 'B'; o.renk = 'sari'; o.ad = 'Zayıf sinyal · bekle'; }
+    else { o.sinif = 'yok'; o.renk = 'kirmizi'; o.ad = 'Sinyal yok'; }
+    return o;
+  }
+
+  var dis = { RISK_TAVAN: RISK_TAVAN, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT, haberSentiment: haberSentiment, haberTazelik: haberTazelik, sinyalSkoruHaber: sinyalSkoruHaber, HABER_AGIRLIK: HABER_AGIRLIK };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
