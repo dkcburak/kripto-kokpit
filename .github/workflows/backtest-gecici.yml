@@ -1,0 +1,22 @@
+name: backtest-gecici
+on:
+  push:
+    branches: [claude/confluence-skoru-q4dkmm]
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: SOL
+        run: |
+          node test/backtest.js SOL m15 2026-09-01 2026-10-15 --indir
+          node test/backtest.js SOL m15
+          node -e "var r=require('./test/backtest-sonuc.json');console.log(JSON.stringify({sayim:r.sinyalSayim,sonuc:r.sonuc,gelistirme:r.gelistirme,test:r.test}))"
+      - name: BTC
+        run: |
+          node test/backtest.js BTC m15 2026-09-01 2026-10-15 --indir
+          node test/backtest.js BTC m15
+          node -e "var r=require('./test/backtest-sonuc.json');console.log(JSON.stringify({sayim:r.sinyalSayim,sonuc:r.sonuc,gelistirme:r.gelistirme,test:r.test}))"
