@@ -220,4 +220,39 @@ t('sinyalSkoruAtr: ayarlı planla baştan skor', function () {
   delete c.mumlar; assert.strictEqual(H.sinyalSkoruAtr(c).atr, undefined);
   c.mumlar = mum.slice(0, 5); assert.strictEqual(H.sinyalSkoruAtr(c).atrNot, 'ATR için yeterli mum yok');
 });
+t('haberSentiment başarılı: örnek skorlar ve zaman metni', function () {
+  var hs1 = [{ yon: 'Olumlu', etki: 'Yüksek', saat: 2 }, { yon: 'Olumlu', etki: 'Orta', saat: 12 }];
+  assert.strictEqual(H.haberSentiment(hs1, 'long').skor, 1.35);
+  assert.strictEqual(H.haberSentiment(hs1, 'short').skor, -1.35); // short'ta olumlu haber ters
+  var hs3 = [{ yon: 'Olumsuz', etki: 'Yüksek', saat: 1 }, { yon: 'Olumsuz', etki: 'Yüksek', saat: 3 }];
+  assert.strictEqual(H.haberSentiment(hs3, 'long').skor, -2);
+  assert.strictEqual(H.haberSentiment([{ yon: 'Olumlu', etki: 'Yüksek', saat: 72 }], 'long').skor, 0);
+  assert.strictEqual(H.haberTazelik(30), 0.4); assert.strictEqual(H.haberTazelik(undefined), 1);
+  // analiz haberlerinde saat yok, zaman metni var: 17 Eki 10:00'da 16 Eki 09:34 haberi ~24,4 saatlik -> 0,4
+  var simdi = new Date(2026, 9, 17, 10, 0).getTime();
+  assert.strictEqual(H.haberSentiment([{ yon: 'Olumlu', etki: 'Yüksek', zaman: '16 Eki 09:34' }], 'long', simdi).skor, 0.4);
+  assert.strictEqual(H.haberSentiment([{ yon: 'Olumlu', etki: 'Yüksek', zaman: '10 Eki 09:34' }], 'long', simdi).skor, 0);
+  assert.strictEqual(H.haberSentiment(null, 'long').skor, 0);
+  // sinyalSkoruHaber: destekleyen haber puanı artırır, maks 19
+  var P = { yon: 'long', giris: [100, 110], stop: 95, tp1: 140 }, tf = { d: 'yukari', h4: 'yukari', h1: 'onay' };
+  var c = { durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: tf, haberler: [{ yon: 'Olumlu', etki: 'Yüksek', saat: 1 }] };
+  var s = H.sinyalSkoruHaber(c, { mod: 'Temkinli' }, { analizSaat: 2 });
+  assert.strictEqual(s.skorHabersiz, 15); assert.strictEqual(s.skor, 15.7); assert.strictEqual(s.maks, 19); assert.strictEqual(s.sinif, 'A+');
+  assert.strictEqual(H.sinyalSkoru(c, { mod: 'Temkinli' }, { analizSaat: 2 }).maks, 17); // sinyalSkoru değişmedi
+});
+t('sinyalSkoruHaber hatalı: ters haber, veto ve tavan korunur', function () {
+  var P = { yon: 'long', giris: [100, 110], stop: 95, tp1: 140 }, tf = { d: 'yukari', h4: 'yukari', h1: 'onay' };
+  var guclu = [{ yon: 'Olumlu', etki: 'Yüksek', saat: 1 }, { yon: 'Olumlu', etki: 'Yüksek', saat: 2 }, { yon: 'Olumlu', etki: 'Yüksek', saat: 3 }];
+  // güçlü ters haber (≤ -2) veto eder
+  var c = { durum: 'long', fiyat: 105, funding: 0.0001, plan: P, tf: tf, haberler: [{ yon: 'Olumsuz', etki: 'Yüksek', saat: 1 }, { yon: 'Olumsuz', etki: 'Yüksek', saat: 2 }] };
+  var s = H.sinyalSkoruHaber(c, { mod: 'Temkinli' }, { analizSaat: 2 });
+  assert.strictEqual(s.skor, 0); assert.strictEqual(s.sinif, 'yok'); assert(/Güçlü ters haber/.test(s.veto));
+  // eski analiz (13 saat) en fazla B kalır, güçlü olumlu haberle bile
+  c.haberler = guclu; s = H.sinyalSkoruHaber(c, { mod: 'Temkinli' }, { analizSaat: 13 });
+  assert(s.skor >= H.SKOR_ESIK.A_PLUS); assert.strictEqual(s.sinif, 'B');
+  // mevcut veto haberle geri gelmez
+  s = H.sinyalSkoruHaber({ durum: 'uzak', fiyat: 105, plan: P, tf: tf, haberler: guclu }, { mod: 'Temkinli' });
+  assert.strictEqual(s.veto, 'Analiz: uzak dur'); assert.strictEqual(s.skor, 0);
+  assert.strictEqual(H.sinyalSkoruHaber(null).skor, 0);
+});
 console.log(n + ' test geçti');
