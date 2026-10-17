@@ -415,3 +415,29 @@ details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
 .kucuk-cizgi{flex:none}
 .okuma{margin:0;padding:0 0 0 18px;display:grid;gap:4px;font-size:13.5px}
 .okuma li::marker{color:var(--sonuk)}
+
+/* ---------- Sinyal skoru (haber dahil, bilgi amaçlı) ---------- */
+.skor-rozet{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font:600 11px var(--f-sayi);letter-spacing:.3px;white-space:nowrap;flex:none}
+.skor-rozet.a-plus{background:var(--long);color:#06140d}
+.skor-rozet.a{color:var(--long);background:color-mix(in srgb,var(--long) 18%,transparent)}
+.skor-rozet.b{color:var(--bekle);background:color-mix(in srgb,var(--bekle) 16%,transparent)}
+.skor-rozet.yok{color:var(--uzak);background:color-mix(in srgb,var(--uzak) 16%,transparent)}
+.skor-rozet.veto{color:var(--short);background:color-mix(in srgb,var(--short) 15%,transparent)}
+.cs-ad:has(.skor-rozet){flex-wrap:wrap;row-gap:4px}
+.sinyal-kart{display:grid;gap:4px;border-left:4px solid var(--uzak)}
+.sinyal-kart.a-plus,.sinyal-kart.a{border-left-color:var(--long)}
+.sinyal-kart.b{border-left-color:var(--bekle)}
+.sinyal-kart.veto{border-left-color:var(--short)}
+.sinyal-ust{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.sinyal-ust h2{margin:0}
+.sinyal-satir{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.sinyal-etiket{color:var(--sonuk)}
+.sinyal-deger{color:var(--yazi);font-weight:500;text-align:right}
+.sinyal-eksik{font-size:12px;color:var(--bekle);margin-top:4px;line-height:1.45}
+.sinyal-veto{font-size:12px;color:var(--short);margin-top:4px;font-weight:600}
+.sinyal-not{font-size:11.5px;color:var(--soluk);margin:4px 0 0}
+.sinyal-ozet{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;margin-bottom:12px;background:var(--yuzey);border:1px solid color-mix(in srgb,var(--long) 45%,var(--cizgi));border-radius:var(--r)}
+.sinyal-ozet-baslik{width:100%;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--sonuk)}
+.sinyal-ozet a{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;background:var(--yuzey2);color:var(--yazi);text-decoration:none;font-size:12.5px}
+.sinyal-ozet a b{font-family:var(--f-baslik)}
+.pk-ust:has(.skor-rozet){flex-wrap:wrap;row-gap:6px}
