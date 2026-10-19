@@ -1,0 +1,41 @@
+# dKc tarayıcı: 15 dakikada bir MEXC açık verisiyle plan adaylarını üretir ve
+# tarayici-veri dalına tek dosya (tarayici.json) olarak yazar. Apps Script bu dosyayı okur.
+# Anahtar kullanmaz, emir vermez. GitHub zamanlaması birkaç dakika gecikebilir.
+name: tarayici
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tarayici
+  cancel-in-progress: false
+
+jobs:
+  tara:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Testler
+        run: node test/tarayici.test.js
+      - name: Tara
+        run: node tarayici/tara.js "$RUNNER_TEMP/tarayici.json"
+      - name: Yayınla (tarayici-veri dalı, tek commit)
+        run: |
+          cd "$RUNNER_TEMP"
+          rm -rf yayin && mkdir yayin && cd yayin
+          git init -q -b tarayici-veri
+          cp "$RUNNER_TEMP/tarayici.json" .
+          git -c user.name="dkc-tarayici" -c user.email="dkc-tarayici@users.noreply.github.com" add tarayici.json
+          git -c user.name="dkc-tarayici" -c user.email="dkc-tarayici@users.noreply.github.com" commit -q -m "tarama $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" tarayici-veri

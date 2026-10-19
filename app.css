@@ -445,3 +445,4 @@ details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
 .karne-baslik{font:600 14px var(--f-baslik);color:var(--yazi);width:100%}
 .karne .kv b{color:var(--yazi);font-weight:700} .karne .kv[style] b{color:inherit}
 .karne .kv{white-space:nowrap}
+.kaynak-rozet{display:inline-flex;align-items:center;font:600 10.5px/1 var(--f-metin);padding:3px 6px;border-radius:6px;white-space:nowrap;color:var(--mavi);background:color-mix(in srgb,var(--mavi) 15%,transparent);margin-left:4px}
