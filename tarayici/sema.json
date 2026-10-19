@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dKc tarayıcı çıktısı (tarayici.json)",
+  "description": "GitHub Actions tarayıcısı yazar, Apps Script Kod.gs tarayiciOku() doğrular. Uymayan coin atılır, 45 dakikadan eski veri plan getirmez.",
+  "type": "object",
+  "required": ["surum", "zaman", "coinler"],
+  "properties": {
+    "surum": { "const": 1 },
+    "zaman": { "type": "number", "description": "Tarama anı, Unix ms" },
+    "analizZamani": { "type": "string" },
+    "taranan": { "type": "integer" },
+    "hacimListesi": { "type": "array", "maxItems": 30, "items": { "type": "string", "pattern": "^[A-Z0-9]{2,15}$" } },
+    "hatalar": { "type": "array", "items": { "type": "string" } },
+    "coinler": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["coin", "kaynak", "durum", "analizZamani", "tf", "plan"],
+        "properties": {
+          "coin": { "type": "string", "pattern": "^[A-Z0-9]{2,15}$" },
+          "kaynak": { "const": "tarayici" },
+          "durum": { "enum": ["long", "short"], "description": "plan.yon ile aynı" },
+          "analizZamani": { "type": "string", "maxLength": 20, "description": "İstanbul saati, örn. 19 Eki 22:30" },
+          "fiyat": { "type": "number" },
+          "funding": { "type": "number" },
+          "ozet": { "type": "string" },
+          "tf": {
+            "type": "object",
+            "required": ["d", "h4"],
+            "properties": { "d": { "enum": ["yukari", "asagi", "yatay"] }, "h4": { "enum": ["yukari", "asagi", "yatay"] }, "h1": { "type": "string" } }
+          },
+          "plan": {
+            "type": "object",
+            "required": ["yon", "giris", "stop", "tp1"],
+            "description": "Long: stop < giriş < tp1 ≤ tp2; short tersi (hesap.js planGecerli)",
+            "properties": {
+              "yon": { "enum": ["long", "short"] },
+              "giris": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "exclusiveMinimum": 0 } },
+              "stop": { "type": "number", "exclusiveMinimum": 0 },
+              "tp1": { "type": "number", "exclusiveMinimum": 0 },
+              "tp2": { "type": "number", "exclusiveMinimum": 0 },
+              "gecersiz": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
