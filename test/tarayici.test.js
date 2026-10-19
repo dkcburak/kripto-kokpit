@@ -87,6 +87,12 @@ var testler = [
       assert.ok(H.analizYasi(s.coinler[0].analizZamani, SN * 1000) < 0.1, 'analiz yaşı okunmalı');
       assert.strictEqual(s.hatalar.length, 1);
       assert.deepStrictEqual(s.hacimListesi, ['SOL', 'BOZUK']);
+      // Kontrat detayı okunamazsa analiz listesi önerilmez
+      return T.tara(function (url) { return /detail$/.test(url) ? Promise.reject(new Error('yok')) : getJson(url); }, SN * 1000);
+    }).then(function (s) {
+      assert.deepStrictEqual(s.hacimListesi, []); assert.strictEqual(s.coinler.length, 1);
+      // Mumların çoğu okunamazsa tarama başarısız
+      return T.tara(function (url) { return /kline/.test(url) ? Promise.resolve({ success: false }) : getJson(url); }, SN * 1000).then(function () { throw new Error('hata beklenirdi'); }, function (e) { assert.ok(/okunamadı/.test(e.message)); });
       assert.ok(H.coinTemizle(s.coinler[0]).plan, 'uygulama planı geçerli saymalı');
     });
   }),

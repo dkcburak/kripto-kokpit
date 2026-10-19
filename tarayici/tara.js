@@ -126,7 +126,10 @@ async function tara(getJson, simdi) {
       if (o.plan) { o.ozet = ozetYaz(o); o.kaynak = 'tarayici'; o.analizZamani = trZaman(simdi); o.cizim = { destek: o.plan.yon === 'long' ? [o.plan.giris] : [], direnc: o.plan.yon === 'short' ? [o.plan.giris] : [], trend: [] }; o.haberler = []; o.islemYok = ''; coinler.push(o); }
     } catch (e) { hatalar.push(c.coin + ': ' + String(e.message || e).slice(0, 60)); }
   }
-  return { surum: 1, zaman: simdi, analizZamani: trZaman(simdi), taranan: taranan.length, hacimListesi: liste.slice(0, AYAR.analizListesi).map(function (x) { return x.coin; }), coinler: coinler, hatalar: hatalar,
+  // Coinlerin yarısından fazlası okunamadıysa tarama başarısız sayılır (boş "taze" veri yayınlanmaz, iş kırmızı görünür)
+  if (taranan.length && hatalar.length > taranan.length / 2) throw new Error('MEXC mumları okunamadı: ' + hatalar.length + '/' + taranan.length);
+  // Kontrat detayı yoksa hisse/emtia ayıklanamadı: analiz listesi önerilmez (sunucu son listeyi kullanır)
+  return { surum: 1, zaman: simdi, analizZamani: trZaman(simdi), taranan: taranan.length, hacimListesi: detayVar ? liste.slice(0, AYAR.analizListesi).map(function (x) { return x.coin; }) : [], coinler: coinler, hatalar: hatalar,
     elenenTradfi: detayVar ? Object.keys(tradfi).length : null };
 }
 
