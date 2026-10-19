@@ -7,9 +7,6 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
-  # GEÇİCİ: birleştirmeden önce dalda gerçek MEXC taraması denemesi (birleştirmeden önce silinir)
-  push:
-    branches: [claude/project-thread-qb1mbc]
 
 permissions:
   contents: write
