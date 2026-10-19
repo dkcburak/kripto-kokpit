@@ -18,7 +18,10 @@ var AYAR = {
   tp1R: 1.51, tp2R: 2.5    // ücret sonrası kazanç/risk (1,51: yuvarlamadan sonra da 1,5'in altına düşmesin)
 };
 // Kripto olmayan ya da sabit fiyatlı semboller taranmaz
-var HARIC = /^(USDC|USDE|FDUSD|TUSD|DAI|USDD|PYUSD|USD1|BUSD|EUR|GBP|XAUT|PAXG|XAU|XAG|SILVER|GOLD)$|STOCK$/;
+var HARIC = /^(USDC|USDE|FDUSD|TUSD|DAI|USDD|PYUSD|USD1|BUSD|EUR|GBP|JPY|XAUT|PAXG|XAU|XAG|SILVER|GOLD|USOIL|UKOIL|SPX500|NAS100|US30)$|STOCK$/;
+// MEXC kontrat detayında hisse, ETF, emtia ve endeks kontratları (tradfi) işaretli; bunlar kripto değil
+var TRADFI = /tradfi|stock|etf|commodit|forex|metal|index/i;
+function tradfiMi(d) { return d && (d.type === 2 || (Array.isArray(d.conceptPlate) && d.conceptPlate.some(function (x) { return TRADFI.test(String(x)); }))); }
 
 // EMA serisinin son değeri
 function ema(kap, n) {
@@ -75,8 +78,9 @@ function planUret(coin, mumlar, fiyat, funding, shortIzin) {
 }
 
 // MEXC ticker listesinden taranacak coinler: USDT vadeli, kripto, hacim eşiğinin üstünde, hacme göre sıralı
-function evren(tickerlar) {
-  return tickerlar.filter(function (t) { return /^[A-Z0-9]{2,15}_USDT$/.test(t.symbol) && !HARIC.test(t.symbol.replace('_USDT', '')) && Number(t.amount24) >= AYAR.minHacim && Number(t.lastPrice) > 0; })
+function evren(tickerlar, tradfi) {
+  tradfi = tradfi || {};
+  return tickerlar.filter(function (t) { return /^[A-Z0-9]{2,15}_USDT$/.test(t.symbol) && !HARIC.test(t.symbol.replace('_USDT', '')) && !tradfi[t.symbol] && Number(t.amount24) >= AYAR.minHacim && Number(t.lastPrice) > 0; })
     .sort(function (a, b) { return Number(b.amount24) - Number(a.amount24); })
     .map(function (t) { return { coin: t.symbol.replace('_USDT', ''), fiyat: Number(t.lastPrice), funding: Number(t.fundingRate), hacim: Number(t.amount24) }; });
 }
@@ -99,7 +103,13 @@ async function tara(getJson, simdi) {
   simdi = simdi || Date.now();
   var t = await getJson('https://contract.mexc.com/api/v1/contract/ticker');
   if (!t || !t.success || !Array.isArray(t.data)) throw new Error('MEXC ticker yanıtı beklenmedik');
-  var liste = evren(t.data), taranan = liste.slice(0, AYAR.coinSayisi), sn = Math.floor(simdi / 1000);
+  // Kontrat detayı alınamazsa yalnızca ad listesiyle elenir (tarama durmaz)
+  var tradfi = {}, detayVar = false;
+  try {
+    var dt = await getJson('https://contract.mexc.com/api/v1/contract/detail');
+    if (dt && dt.success && Array.isArray(dt.data)) { detayVar = true; dt.data.forEach(function (d) { if (tradfiMi(d)) tradfi[d.symbol] = true; }); }
+  } catch (e) { detayVar = false; }
+  var liste = evren(t.data, tradfi), taranan = liste.slice(0, AYAR.coinSayisi), sn = Math.floor(simdi / 1000);
   var coinler = [], hatalar = [];
   for (var i = 0; i < taranan.length; i++) {
     var c = taranan[i], mumlar = {};
@@ -116,10 +126,11 @@ async function tara(getJson, simdi) {
       if (o.plan) { o.ozet = ozetYaz(o); o.kaynak = 'tarayici'; o.analizZamani = trZaman(simdi); o.cizim = { destek: o.plan.yon === 'long' ? [o.plan.giris] : [], direnc: o.plan.yon === 'short' ? [o.plan.giris] : [], trend: [] }; o.haberler = []; o.islemYok = ''; coinler.push(o); }
     } catch (e) { hatalar.push(c.coin + ': ' + String(e.message || e).slice(0, 60)); }
   }
-  return { surum: 1, zaman: simdi, analizZamani: trZaman(simdi), taranan: taranan.length, hacimListesi: liste.slice(0, AYAR.analizListesi).map(function (x) { return x.coin; }), coinler: coinler, hatalar: hatalar };
+  return { surum: 1, zaman: simdi, analizZamani: trZaman(simdi), taranan: taranan.length, hacimListesi: liste.slice(0, AYAR.analizListesi).map(function (x) { return x.coin; }), coinler: coinler, hatalar: hatalar,
+    elenenTradfi: detayVar ? Object.keys(tradfi).length : null };
 }
 
-module.exports = { AYAR: AYAR, ema: ema, trend: trend, planUret: planUret, evren: evren, trZaman: trZaman, tara: tara };
+module.exports = { AYAR: AYAR, tradfiMi: tradfiMi, ema: ema, trend: trend, planUret: planUret, evren: evren, trZaman: trZaman, tara: tara };
 
 if (require.main === module) {
   var fs = require('fs'), hedef = process.argv[2] || 'tarayici.json';

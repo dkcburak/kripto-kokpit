@@ -61,6 +61,11 @@ var testler = [
       { symbol: 'ETH_USD', amount24: 9e9, lastPrice: 2400 }
     ]);
     assert.deepStrictEqual(l.map(function (x) { return x.coin; }), ['BTC', 'SOL']);
+    // Kontrat detayı tradfi diyorsa (hisse/ETF/emtia) adı bilinmese de elenir
+    var l2 = T.evren([{ symbol: 'SOXL_USDT', amount24: 9e9, lastPrice: 100 }, { symbol: 'BTC_USDT', amount24: 3e9, lastPrice: 82000 }], { SOXL_USDT: true });
+    assert.deepStrictEqual(l2.map(function (x) { return x.coin; }), ['BTC']);
+    assert.ok(T.tradfiMi({ type: 2 })); assert.ok(T.tradfiMi({ type: 1, conceptPlate: ['mc-trade-zone-tradfi'] }));
+    assert.ok(!T.tradfiMi({ type: 1, conceptPlate: ['mc-trade-zone-layer1'] }));
   }),
   t('tara: sahte MEXC ile uçtan uca; bozuk coin yalnız kendisi düşer, açık mum hesaba girmez', function () {
     var h4 = seri(200, 100, 0.002, 14400, SN), d = seri(120, 60, 0.005, 86400, SN);
@@ -70,6 +75,7 @@ var testler = [
     function paket(m) { return { success: true, data: { time: m.map(function (x) { return x.time; }), open: m.map(function (x) { return x.open; }), high: m.map(function (x) { return x.high; }), low: m.map(function (x) { return x.low; }), close: m.map(function (x) { return x.close; }) } }; }
     var getJson = function (url) {
       if (/ticker$/.test(url)) return Promise.resolve({ success: true, data: [{ symbol: 'SOL_USDT', amount24: 9e8, lastPrice: e20, fundingRate: 0.0001 }, { symbol: 'BOZUK_USDT', amount24: 5e8, lastPrice: 1, fundingRate: 0 }] });
+      if (/detail$/.test(url)) return Promise.resolve({ success: true, data: [{ symbol: 'SOXL_USDT', type: 2 }] });
       if (/BOZUK/.test(url)) return Promise.resolve({ success: false });
       return Promise.resolve(paket((/Hour4/.test(url) ? h4 : d).concat([acik])));
     };
