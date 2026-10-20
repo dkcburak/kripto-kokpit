@@ -59,7 +59,9 @@ function pusulaBtc(tf) {
   return tf.d === 'yukari' ? 'long' : 'short';
 }
 
-function simule(veri, adim, kural) {
+// sec: { onay: giriş mumu EMA20'nin trend tarafında kapanmalı (giriş kapanıştan), hedefR: ücret sonrası hedef }
+function simule(veri, adim, kural, sec) {
+  sec = sec || {};
   var zamanlar = Object.keys(adim.BTC || {}).map(Number).sort(function (a, b) { return a - b; });
   var acik = [], biten = [], tersAyniAnda = 0, maxAcik = 0, coinler = Object.keys(veri);
   zamanlar.forEach(function (t) {
@@ -88,10 +90,15 @@ function simule(veri, adim, kural) {
         if (acik.length >= 3) return;
       } else if (acik.filter(function (a) { return a.yon === p.yon; }).length >= 5) return;
       var dokundu = lng ? m.low <= g : m.high >= g; if (!dokundu) return;
+      // Onay: mum bölgeye değip EMA20'nin trend tarafında kapandıysa kapanıştan girilir (1S onayının 4S yaklaşığı)
+      if (sec.onay) { if (lng ? m.close <= g : m.close >= g) return; g = m.close; }
       var risk = Math.abs(g - p.stop), u = H.UCRET * g;
-      var a = { coin: coin, yon: p.yon, stop: p.stop, tp1: p.tp1, i: x.i + 2, kazancR: (Math.abs(p.tp1 - g) - u) / risk, kayipR: -(risk + u) / risk };
+      if (!(risk > 0) || (lng ? g <= p.stop : g >= p.stop)) return;
+      var tp1 = p.tp1;
+      if (sec.hedefR) { var mes = sec.hedefR * (risk + u) + u; tp1 = lng ? g + mes : g - mes; }
+      var a = { coin: coin, yon: p.yon, stop: p.stop, tp1: tp1, i: x.i + 2, kazancR: (Math.abs(tp1 - g) - u) / risk, kayipR: -(risk + u) / risk };
       // giriş mumunda stop da görüldüyse kayıp say (temkinli)
-      if (lng ? m.low <= p.stop : m.high >= p.stop) { biten.push({ coin: coin, yon: p.yon, r: a.kayipR, t: t }); return; }
+      if (!sec.onay && (lng ? m.low <= p.stop : m.high >= p.stop)) { biten.push({ coin: coin, yon: p.yon, r: a.kayipR, t: t }); return; }
       if (kural === 'eski' && acik.some(function (b) { return b.yon !== p.yon; })) tersAyniAnda++;
       acik.push(a);
     });
@@ -124,6 +131,12 @@ async function calis() {
   console.log('Veri: ' + Object.keys(veri).map(function (c) { return c + ' ' + veri[c].h4.length + '/' + veri[c].d.length; }).join(', '));
   var adim = hazirla(veri), sonuc = {};
   ['eski', 'yeni', 'esnek'].forEach(function (k) { sonuc[k] = simule(veri, adim, k); });
+  // Varyasyonlar (yeni kural üstünde): giriş onayı ve hedef
+  [['yeni+onay', { onay: true }], ['yeni+hedef2.5R', { hedefR: 2.5 }], ['yeni+onay+hedef2.5R', { onay: true, hedefR: 2.5 }], ['yeni+onay+hedef2R', { onay: true, hedefR: 2 }], ['eski+onay', { onay: true }]].forEach(function (v) {
+    sonuc[v[0]] = simule(veri, adim, v[0].indexOf('eski') === 0 ? 'eski' : 'yeni', v[1]);
+  });
+  var tablo = Object.keys(sonuc).map(function (k) { var r = sonuc[k]; return [k, r.islem, '%' + r.isabet, r.ortR, r.toplamR, r.maxDususR, r.artiAy, r.tersAyniAnda].join(' | '); });
+  console.log('TABLO kural | işlem | isabet | ort R | toplam R | en büyük düşüş R | artı ay | ters aynı anda\n' + tablo.join('\n'));
   var btcZaman = Object.keys(adim.BTC).map(Number), yonlu = btcZaman.filter(function (t) { return pusulaBtc(adim.BTC[t].tf); }).length;
   console.log('Dönem: ' + GUN + ' gün, ' + Object.keys(veri).length + ' coin. BTC yönlü (1G=4S) zaman: %' + Math.round(yonlu / btcZaman.length * 100));
   console.log('SONUC ' + JSON.stringify(sonuc, null, 1));
