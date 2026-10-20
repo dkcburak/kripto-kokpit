@@ -23,25 +23,8 @@ var HARIC = /^(USDC|USDE|FDUSD|TUSD|DAI|USDD|PYUSD|USD1|BUSD|EUR|GBP|JPY|XAUT|PA
 var TRADFI = /tradfi|stock|etf|commodit|forex|metal|index/i;
 function tradfiMi(d) { return d && (d.type === 2 || (Array.isArray(d.conceptPlate) && d.conceptPlate.some(function (x) { return TRADFI.test(String(x)); }))); }
 
-// EMA serisinin son değeri
-function ema(kap, n) {
-  if (kap.length < n) return null;
-  var k = 2 / (n + 1), e = 0, i;
-  for (i = 0; i < n; i++) e += kap[i];
-  e /= n;
-  for (i = n; i < kap.length; i++) e = kap[i] * k + e * (1 - k);
-  return e;
-}
-
-// Trend: kapanış EMA50'nin, EMA20 de EMA50'nin üstündeyse yukarı; ikisi de altındaysa aşağı; aksi yatay
-function trend(mumlar) {
-  var kap = mumlar.map(function (m) { return m.close; });
-  var e20 = ema(kap, 20), e50 = ema(kap, 50), c = kap[kap.length - 1];
-  if (e20 == null || e50 == null) return null;
-  if (c > e50 && e20 > e50) return 'yukari';
-  if (c < e50 && e20 < e50) return 'asagi';
-  return 'yatay';
-}
+// EMA ve trend tanımı hesap.js'den gelir: uygulama, sunucu ve tarayıcı aynı formülü kullanır
+var ema = H.emaSon, trend = H.trendEma;
 
 function yuvarla(x) { return Number(x.toPrecision(6)); }
 // Ücret sonrası kazanç/risk = r olacak hedef uzaklığı (hesap.js planHesap r1Net formülünün tersi)

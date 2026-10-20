@@ -37,7 +37,24 @@
   function cf(c) { return ' data-cf="' + esc(c.coin) + '"'; }
   function cd(c) { return ' data-cd="' + esc(c.coin) + '"'; }
   function kararRozet(k) { return '<span class="durum d-' + k.renk + '">' + k.ad + '</span>'; }
-  function kararBul(c) { var v = durum.veri; return H.karar(c, v && v.piyasa, { analizSaat: H.analizYasi(analizAni(c)) }); }
+  function kararBul(c) { return H.karar(c, piyasaBul(), kararEk(c)); }
+  // Piyasa + pusula girdisi: sunucu canlı BTC trendini (btcTf) yazar; eski sunucuda analizdeki BTC trendi kullanılır
+  function piyasaBul() {
+    var v = durum.veri; if (!v) return null;
+    var p = v.piyasa || {}; if (p.btcTf) return p;
+    var b = (v.coinler || []).filter(function (c) { return c.coin === 'BTC'; })[0], o = {};
+    for (var x in p) o[x] = p[x];
+    o.btcTf = b && b.tf ? { d: b.tf.d, h4: b.tf.h4 } : {};
+    return o;
+  }
+  // Açık işlemlerin yönleri: ters yönde açık işlem varken yeni plan gösterilmez
+  function kararEk(c) {
+    var y = { long: 0, short: 0 };
+    durum.poz.forEach(function (p) { y[p.yon === 'short' ? 'short' : 'long']++; });
+    return { analizSaat: H.analizYasi(analizAni(c)), acikYon: y };
+  }
+  // Engelli plan (pusulaya, trende ya da açık işleme ters) grafikte ve şeritte gösterilmez
+  function planGoster(c) { return c && c.plan && !kararBul(c).engel ? c.plan : null; }
   // Tarayıcı planı kendi saatini taşır; diğerleri günün analizinden
   function analizAni(c) { var v = durum.veri; return (c && c.kaynak === 'tarayici' && c.analizZamani) || (v && v.analizZamani) || ''; }
   function kaynakRozet(c) { return c && c.kaynak === 'tarayici' && c.plan ? '<span class="kaynak-rozet" title="Plan 15 dakikada bir çalışan tarayıcıdan">Tarayıcı</span>' : ''; }
@@ -197,7 +214,7 @@
     if (!durum.poz.length) return { deger: '%0', alt: 'tavan %' + r.tavan };
     if (!durum.sermaye) return { deger: '–', alt: 'sermaye girin' };
     var y = r.yonler || {}, iki = y.long > 0 && y.short > 0;
-    return { deger: '%' + f(r.yuzde, 1), alt: (iki ? 'L %' + f(y.long, 1) + ' · S %' + f(y.short, 1) + ' · ' : '') + 'yön başına tavan %' + r.tavan + (r.bilinmeyen ? ' · ' + r.bilinmeyen + ' stopsuz' : '') };
+    return { deger: '%' + f(r.yuzde, 1), alt: (iki ? 'L %' + f(y.long, 1) + ' · S %' + f(y.short, 1) + ' · ' : '') + 'tavan %' + r.tavan + (r.bilinmeyen ? ' · ' + r.bilinmeyen + ' stopsuz' : '') };
   }
   function kutucuklar() {
     var s = ozetSayilar(), ry = riskYazi(s.risk);
@@ -210,9 +227,15 @@
     if (!p || !p.mod) return '';
     var renk = p.mod === 'Risk açık' ? 'var(--long)' : p.mod === 'Riskten kaçış' ? 'var(--short)' : 'var(--bekle)';
     return '<details class="piyasa"><summary><span class="mod"><span class="isik" style="background:' + renk + '"></span>Piyasa: ' + esc(p.mod) + '</span>' +
-      (p.btc ? '<span class="kv">BTC <b>' + esc(p.btc) + '</b></span>' : '') +
+      (p.btc ? '<span class="kv">BTC <b>' + esc(p.btc) + '</b></span>' : '') + pusulaHtml() +
       (p.korku ? '<span class="kv">Korku/Açgözlülük <b>' + esc(p.korku.deger) + '</b></span>' : '') + dominansHtml(p.dominans) + '</summary>' +
       (p.not ? '<p>' + esc(p.not) + '</p>' : '') + '</details>';
+  }
+  // Piyasa yönü (pusula): aynı anda yalnız bu yönde plan gösterilir
+  function pusulaHtml() {
+    var pu = H.pusula(piyasaBul()); if (!pu) return '';
+    var ad = pu.yon === 'long' ? '▲ LONG' : pu.yon === 'short' ? '▼ SHORT' : 'Belirsiz', renk = pu.yon === 'long' ? 'var(--long)' : pu.yon === 'short' ? 'var(--short-yon)' : 'var(--bekle)';
+    return '<span class="kv" title="' + esc(pu.neden) + '">Yön <b style="color:' + renk + '">' + ad + '</b></span>';
   }
   // Dominance (analiz yazar): değer + 4 saatlik yön oku. USDT.D yükselişi long, BTC.D yükselişi altcoin long aleyhine.
   var DOM_OK = { yukari: '↑', asagi: '↓', yatay: '→' };
@@ -475,7 +498,7 @@
   // Özet şeridi: grafiğin üstünde işlem tipi, giriş, stop, hedef, kazanç/risk ve pozisyon tek bakışta
   function ozetSeritHtml(c) {
     var k = kararBul(c), p = c.plan;
-    if (!p || !k.yon) return '<section class="blok serit serit-kirmizi" id="dOzet"><div class="serit-ust">' + kararRozet(k) + '<span class="serit-neden">' + esc(c.islemYok || k.neden || 'İşlem planı yok') + '</span></div></section>';
+    if (!p || !k.yon || k.engel) return '<section class="blok serit serit-kirmizi" id="dOzet"><div class="serit-ust">' + kararRozet(k) + '<span class="serit-neden">' + esc(c.islemYok || k.neden || 'İşlem planı yok') + '</span></div></section>';
     var h = k.h, kut = function (et, deger, alt, cls) { return '<div class="sk"><span class="sk-et">' + et + '</span><b class="sayi ' + (cls || '') + '">' + deger + '</b>' + (alt ? '<small>' + alt + '</small>' : '') + '</div>'; };
     return '<section class="blok serit serit-' + k.renk + '" id="dOzet"><div class="serit-ust">' + yonRozet(k.yon) + kararRozet(k) +
       '<span class="serit-sinif" title="A: 1G ve 4S aynı yönde. B: 1G yatay, 4S aynı yönde (yarım risk).">Sınıf ' + esc(k.sinif) + ' · risk %' + f(k.riskYuzde, 1) + '</span></div>' +
@@ -484,7 +507,7 @@
       kut('Stop', f(p.stop), yuzde(h.stopYuzde) + ' uzakta', 'eks') +
       kut('Hedef 1 · 2', f(p.tp1) + (p.tp2 ? ' · ' + f(p.tp2) : ''), 'Hedef 1 ' + yuzde(Math.abs(p.tp1 - h.giris) / h.giris * 100) + ' kazanç', 'art') +
       kut('Kazanç / risk', oran(h.r1Net) + (h.r2 ? ' · ' + oran(h.r2) : '') + 'R', 'ücret sonrası', h.r1Net >= 1.5 ? '' : 'vurgu') +
-      kut('Pozisyon', '%' + f(h.poz, 0), 'sermayenin · ' + (h.kalUygun ? (h.kal > 1 ? h.kal + 'x' : '1x') : 'küçültün'), '') +
+      kut('Pozisyon', '%' + f(h.poz, 0), 'sermayenin · ' + (h.kalUygun ? h.kal + 'x' : 'küçültün'), '') +
       '</div></section>';
   }
   // Karar kartı: üç koşul ve plan ayrıntısı. Emir değildir, planın koşul durumudur.
@@ -503,7 +526,7 @@
       var h = k.h || H.planHesap(p);
       plan = '<dl class="plan">' +
         '<dt>Hedef 1’de</dt><dd>yarısını kapat, stopu girişe çek</dd>' +
-        '<dt>Kaldıraç</dt><dd class="sayi">' + (h.kalUygun ? (h.kal === 1 ? 'gerekmez (1x)' : h.kal + 'x yeterli') : 'pozisyonu küçültün') + '</dd>' +
+        '<dt>Kaldıraç</dt><dd class="sayi">' + (h.kalUygun ? h.kal + 'x önerilen (en fazla ' + h.maxKal + 'x)' : 'pozisyonu küçültün') + '</dd>' +
         (c.funding != null ? '<dt>Funding (8 saat)</dt><dd class="sayi">%' + f(c.funding * 100, 4) + '</dd>' : '') +
         '</dl>' + (p.gecersiz ? '<p class="plan-not">' + esc(p.gecersiz) + '</p>' : '');
     }
@@ -517,8 +540,7 @@
   var SKOR_SINIF = { 'A+': 'a-plus', A: 'a', B: 'b' };
   function skorBul(c) {
     if (!c || !c.plan || !H.sinyalSkoruHaber) return null;
-    var v = durum.veri;
-    try { return H.sinyalSkoruHaber(c, v && v.piyasa, { analizSaat: H.analizYasi(analizAni(c)) }); } catch (e) { return null; }
+    try { return H.sinyalSkoruHaber(c, piyasaBul(), kararEk(c)); } catch (e) { return null; }
   }
   function skorSinif(skor) { return skor.veto ? 'veto' : SKOR_SINIF[skor.sinif] || 'yok'; }
   function skorSayi(x) { return f(x || 0, x % 1 ? 1 : 0); }
@@ -726,7 +748,7 @@
   function detayEkran(coin) {
     var c = coinBul(coin);
     if (!c) return '<a class="geri" href="#/">← Kokpit</a><p class="bos">' + esc(coin) + ' listede yok.</p>';
-    var fav = favoriMi(c.coin), seviye = katman('seviye'), plan = katman('plan') && c.plan, gos = katman('gosterge');
+    var fav = favoriMi(c.coin), seviye = katman('seviye'), plan = katman('plan') && planGoster(c), gos = katman('gosterge');
     var yr = c.plan && c.plan.yon === 'short' ? 'var(--short-yon)' : 'var(--long)';
     var cip = function (k, ad) { return '<button class="katman" data-katman="' + k + '" aria-pressed="' + katman(k) + '">' + ad + '</button>'; };
     return '<div class="d-ust"><a class="geri-ikon" href="#/" aria-label="Geri"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>' +
@@ -759,12 +781,12 @@
   // ---------- İşlemlerim ----------
   function islemEkran() {
     var r = H.toplamRisk(durum.poz.filter(function (p) { return coinBul(p.coin); }), fiyatlar(), durum.sermaye), ry = riskYazi(r);
-    var dol = durum.sermaye ? Math.min(100, Math.max(r.yonler.long, r.yonler.short) / r.tavan * 100) : 0;
+    var dol = durum.sermaye ? Math.min(100, r.yuzde / r.tavan * 100) : 0;
     return '<section class="blok"><h2>Sermaye ve toplam risk</h2>' +
       '<label class="alan"><span>Futures sermayeniz (USDT)</span><input id="sermaye" inputmode="decimal" autocomplete="off" placeholder="ör. 1000" value="' + esc(durum.sermaye || '') + '"></label>' +
-      '<div class="risk-cubuk' + (r.asildi ? ' asildi' : '') + '" role="img" aria-label="Açık risk ' + ry.deger + ', yön başına tavan yüzde ' + r.tavan + '"><i style="width:' + dol + '%"></i></div>' +
-      '<p class="risk-yazi">Açık risk <b>' + ry.deger + '</b> · ' + esc(ry.alt) + (r.asildi ? ' · <span class="eks">Bir yönde tavan aşıldı: o yönde yeni işlem açmayın, pozisyon küçültmeyi düşünün.</span>' : '') + '</p>' +
-      '<p class="plan-not">Risk = stop olursa kaybedilecek tutar. Aynı yöndeki kripto işlemleri birlikte hareket ettiği için tavan long ve short için ayrı ayrı %5’tir. Ücret ve funding hariçtir.</p></section>' +
+      '<div class="risk-cubuk' + (r.asildi ? ' asildi' : '') + '" role="img" aria-label="Açık risk ' + ry.deger + ', tavan yüzde ' + r.tavan + '"><i style="width:' + dol + '%"></i></div>' +
+      '<p class="risk-yazi">Açık risk <b>' + ry.deger + '</b> · ' + esc(ry.alt) + (r.asildi ? ' · <span class="eks">Tavan aşıldı: yeni işlem açmayın, pozisyon küçültmeyi düşünün.</span>' : '') + '</p>' +
+      '<p class="plan-not">Risk = stop olursa kaybedilecek tutar. Tavan long ve short birlikte %3’tür; aynı anda tek yönde işlem açılır. Ücret ve funding hariçtir.</p></section>' +
       '<section class="blok"><h2>Açık işlemlerim</h2>' + (durum.poz.length ? '<div class="plan-kartlar">' + durum.poz.map(function (p) {
         var c = coinBul(p.coin) || { coin: p.coin, fiyat: null };
         return '<div>' + pozKartHtml(c, p, true) + '<button class="dugme ikincil kucuk poz-sil" data-poz-sil="' + esc(p.coin) + '">Kapattım, listeden çıkar</button></div>';
@@ -848,7 +870,7 @@
     var kutu = $('grafik'); if (!kutu || !window.LightweightCharts) return;
     grafikKaldir(); kutu.innerHTML = '';
     var css = getComputedStyle(document.documentElement), r = function (n) { return css.getPropertyValue(n).trim(); };
-    var cz = c.cizim || {}, seviye = katman('seviye'), gos = katman('gosterge'), liq = katman('likidasyon'), p = katman('plan') ? c.plan : null, poz = pozBul(c.coin), seviyeler = [], sart = [];
+    var cz = c.cizim || {}, seviye = katman('seviye'), gos = katman('gosterge'), liq = katman('likidasyon'), p = katman('plan') ? planGoster(c) : null, poz = pozBul(c.coin), seviyeler = [], sart = [];
     var g = LightweightCharts.createChart(kutu, {
       autoSize: true, layout: { background: { color: 'transparent' }, textColor: r('--sonuk'), fontFamily: 'IBM Plex Sans, system-ui, sans-serif' },
       grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
