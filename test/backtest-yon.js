@@ -143,4 +143,4 @@ async function calis() {
 }
 
 if (require.main === module) calis().catch(function (e) { console.error('Backtest başarısız: ' + e.message); process.exit(1); });
-module.exports = { pusulaBtc: pusulaBtc, simule: simule, hazirla: hazirla, ozet: ozet };
+module.exports = { pusulaBtc: pusulaBtc, simule: simule, hazirla: hazirla, ozet: ozet, mumlar: mumlar };
