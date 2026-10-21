@@ -86,7 +86,8 @@
 
   // Canlı 1 saatlik onay. mumlar: 1S mumları {open, high, low, close}, en eskiden yeniye; son mum açık (yarım) sayılır.
   // onay: son 3 kapanmış mumdan biri giriş bölgesine değmiş, son kapanmış mum plan yönünde kapanmış ve kapanış
-  // bölgede ya da bölgenin hedef tarafında (Hedef 1'e varmadan). yok: son kapanış bölgenin stop tarafında. Aksi: bekliyor.
+  // bölge ortasının hedef tarafında (Hedef 1'e varmadan). yok: son kapanış bölgenin stop tarafında. Aksi: bekliyor.
+  // Bölge ortası şartı backtest'ten (21 Eki): ortanın trend tarafında kapanışla giriş, isabeti %32'den %53'e çıkardı.
   function h1Onay(mumlar, plan) {
     var o = { durum: 'bekliyor', sebep: '1S verisi yok' };
     if (!plan || !Array.isArray(mumlar) || mumlar.length < 4) return o;
@@ -98,6 +99,7 @@
     if (lng ? son.c < alt : son.c > ust) return { durum: 'yok', sebep: '1S kapanış bölgenin ' + (lng ? 'altında' : 'üstünde') };
     if (!degdi) return { durum: 'bekliyor', sebep: '1S mum bölgeye değmedi' };
     if (lng ? son.c >= plan.tp1 : son.c <= plan.tp1) return { durum: 'bekliyor', sebep: 'fiyat Hedef 1\'e vardı' };
+    if (lng ? son.c <= (alt + ust) / 2 : son.c >= (alt + ust) / 2) return { durum: 'bekliyor', sebep: '1S kapanış bölge ortasını geçmedi' };
     if (lng ? son.c > son.o : son.c < son.o) return { durum: 'onay', sebep: '1S mum bölgeden ' + (lng ? 'yukarı' : 'aşağı') + ' kapandı' };
     return { durum: 'bekliyor', sebep: '1S mum ' + (lng ? 'yukarı' : 'aşağı') + ' kapanmadı' };
   }

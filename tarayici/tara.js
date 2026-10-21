@@ -15,7 +15,7 @@ var AYAR = {
   stopAtr: 1,              // stop: bölgenin 1 ATR (4S) ötesi
   maxStop: 0.08,           // stop mesafesi en fazla %8
   maxUzaklik: 2,           // fiyat bölgeye en fazla 2 ATR (4S) uzaktaysa plan yazılır
-  tp1R: 1.51, tp2R: 2.5    // ücret sonrası kazanç/risk (1,51: yuvarlamadan sonra da 1,5'in altına düşmesin)
+  tp1R: 2, tp2R: 3         // ücret sonrası kazanç/risk; backtest (21 Eki): 1,51R hedef kârsızdı, onaylı girişle 2R artıda
 };
 // Kripto olmayan ya da sabit fiyatlı semboller taranmaz
 var HARIC = /^(USDC|USDE|FDUSD|TUSD|DAI|USDD|PYUSD|USD1|BUSD|EUR|GBP|JPY|XAUT|PAXG|XAU|XAG|SILVER|GOLD|USOIL|UKOIL|SPX500|NAS100|US30)$|STOCK$/;

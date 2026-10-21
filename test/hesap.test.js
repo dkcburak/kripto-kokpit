@@ -290,6 +290,8 @@ t('h1Onay canlı 1 saatlik onay', function () {
   assert.strictEqual(H.h1Onay([m(120, 121, 118, 119), m(119, 121, 115, 116), m(116, 118, 112, 113), m(113, 116, 112, 115), m(115, 115, 105, 106)], L).durum, 'bekliyor');
   // short 100-110 (stop 115): bölgeye değip aşağı kapandı -> onay
   assert.strictEqual(H.h1Onay([m(95, 98, 94, 97), m(97, 102, 96, 101), m(101, 106, 100, 105), m(105, 106, 101, 102), acik], S).durum, 'onay');
+  // yukarı kapandı ama bölge ortasının (105) altında -> bekliyor
+  assert.strictEqual(H.h1Onay([m(115, 116, 112, 113), m(113, 113, 108, 109), m(109, 110, 101, 102), m(102, 105, 101, 104), acik], L).durum, 'bekliyor');
   // eksik veri
   assert.strictEqual(H.h1Onay(null, L).durum, 'bekliyor'); assert.strictEqual(H.h1Onay([acik], L).durum, 'bekliyor');
 });
