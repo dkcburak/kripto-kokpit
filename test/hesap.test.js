@@ -60,7 +60,7 @@ t('karar', function () {
   // 1S onayı yok -> sarı
   k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yukari', h1: 'yok' } })); assert.strictEqual(k.renk, 'sari'); assert(k.eksik.indexOf('1S onayı yok') >= 0); assert(!k.teknik && k.temel && k.fiyat);
   // 4S ters
-  k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } })); assert.strictEqual(k.renk, 'sari');
+  k = H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } })); assert.strictEqual(k.renk, 'kirmizi'); assert(k.engel);
   // ters yüksek haber, aynı yöndeki haber sorun değil
   k = H.karar(Object.assign({}, tamam, { haberler: [{ etki: 'Yüksek', yon: 'Olumsuz' }] })); assert.strictEqual(k.renk, 'sari'); assert(!k.temel);
   assert.strictEqual(H.karar(Object.assign({}, tamam, { haberler: [{ etki: 'Yüksek', yon: 'Olumlu' }, { etki: 'Orta', yon: 'Olumsuz' }] })).renk, 'yesil');
@@ -87,9 +87,9 @@ t('karar', function () {
   assert.strictEqual(H.karar(b, { mod: 'Risk açık' }).renk, 'sari');
   assert.strictEqual(H.karar(Object.assign({}, b, { funding: -0.0005 })).renk, 'sari');
   // trend tersi (C) asla yeşil olmaz
-  k = H.karar({ coin: 'Z', durum: 'short', plan: S, fiyat: 105, tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } }); assert.strictEqual(k.sinif, 'C'); assert.strictEqual(k.renk, 'sari');
+  k = H.karar({ coin: 'Z', durum: 'short', plan: S, fiyat: 105, tf: { d: 'yukari', h4: 'asagi', h1: 'onay' } }); assert.strictEqual(k.sinif, 'C'); assert.strictEqual(k.renk, 'kirmizi'); assert(k.engel);
   // 4S yatay long -> sarı
-  assert.strictEqual(H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yatay', h1: 'onay' } })).renk, 'sari');
+  assert.strictEqual(H.karar(Object.assign({}, tamam, { tf: { d: 'yukari', h4: 'yatay', h1: 'onay' } })).renk, 'kirmizi');
   // ücret sonrası kazanç/risk 1,5 altı -> sarı
   k = H.karar(Object.assign({}, tamam, { plan: { yon: 'long', giris: [100, 110], stop: 95, tp1: 120 } })); assert.strictEqual(k.renk, 'sari'); assert(/ücret sonrası/.test(k.eksik.join()));
   // eski analiz -> sarı
@@ -113,9 +113,11 @@ t('analizYasi', function () {
   assert.strictEqual(H.analizYasi('', simdi), null);
   assert(H.analizYasi('31 Ara 10:00', simdi) > 24 * 200);
 });
-t('toplamRisk yön başına', function () {
+t('toplamRisk tek tavan (long + short birlikte)', function () {
   var p = [{ coin: 'A', yon: 'long', giris: 100, buyukluk: 1000, stop: 96 }, { coin: 'B', yon: 'short', giris: 10, buyukluk: 1000, stop: 10.4 }];
-  var r = H.toplamRisk(p, { A: 100, B: 10 }, 1000); assert(Math.abs(r.yuzde - 8) < 1e-9); assert(!r.asildi); assert(Math.abs(r.yonler.short - 4) < 1e-9);
+  var r = H.toplamRisk(p, { A: 100, B: 10 }, 1000); assert(Math.abs(r.yuzde - 8) < 1e-9); assert(r.asildi); assert(Math.abs(r.yonler.short - 4) < 1e-9);
+  assert(!H.toplamRisk(p.slice(0, 1), { A: 100 }, 2000).asildi); // %2
+  assert.strictEqual(H.RISK_TAVAN, 3);
 });
 t('turevHesap', function () {
   var oi = [{ sumOpenInterestValue: '100' }, { sumOpenInterestValue: '110' }];
@@ -201,12 +203,12 @@ t('atrStopTp başarılı: ATR stopu sıkı, plan kurala uyar', function () {
   var pe = H.atrStopTp({ yon: 'long', giris: [0.0000100, 0.0000102], stop: 0.0000090, tp1: 0.0000130 }, 0.0000002, 0.0000101);
   assert.strictEqual(pe.stop, 0.0000098); assert(pe.tp1 > 0.0000102);
 });
-t('atrStopTp hatalı: bölge içi, 5x sınırı, geçersiz girdi', function () {
+t('atrStopTp hatalı: bölge içi, 10x sınırı, geçersiz girdi', function () {
   var P = { yon: 'long', giris: [80000, 80400], stop: 78800, tp1: 83000, tp2: 84500 };
   var a = H.atrStopTp(P, 80, 80200); // ATR stopu 80080: giriş bölgesinin içinde
   assert.strictEqual(a.kaynak, 'claude'); assert.strictEqual(a.stop, 78800); assert(/bölgesinin içinde/.test(a.notlar[0]));
-  a = H.atrStopTp({ yon: 'long', giris: [80150, 80250], stop: 78800, tp1: 83000 }, 80, 80200); // ATR stopu 80080 (%0,15): %1 risk için 5x yetmez
-  assert.strictEqual(a.kaynak, 'claude'); assert(/5x/.test(a.notlar[0]));
+  a = H.atrStopTp({ yon: 'long', giris: [80150, 80250], stop: 78800, tp1: 83000 }, 43, 80200); // ATR stopu 80135,5 (%0,08): %1 risk için 10x yetmez
+  assert.strictEqual(a.kaynak, 'claude'); assert(/10x/.test(a.notlar[0]));
   assert.strictEqual(H.atrStopTp(P, 0, 80200), null);
   assert.strictEqual(H.atrStopTp({ yon: 'long', giris: [100], stop: 95, tp1: 110 }, 4, 100), null);
   assert.strictEqual(H.atrStopTp(null, 4, 100), null);
@@ -288,6 +290,8 @@ t('h1Onay canlı 1 saatlik onay', function () {
   assert.strictEqual(H.h1Onay([m(120, 121, 118, 119), m(119, 121, 115, 116), m(116, 118, 112, 113), m(113, 116, 112, 115), m(115, 115, 105, 106)], L).durum, 'bekliyor');
   // short 100-110 (stop 115): bölgeye değip aşağı kapandı -> onay
   assert.strictEqual(H.h1Onay([m(95, 98, 94, 97), m(97, 102, 96, 101), m(101, 106, 100, 105), m(105, 106, 101, 102), acik], S).durum, 'onay');
+  // yukarı kapandı ama bölge ortasının (105) altında -> bekliyor
+  assert.strictEqual(H.h1Onay([m(115, 116, 112, 113), m(113, 113, 108, 109), m(109, 110, 101, 102), m(102, 105, 101, 104), acik], L).durum, 'bekliyor');
   // eksik veri
   assert.strictEqual(H.h1Onay(null, L).durum, 'bekliyor'); assert.strictEqual(H.h1Onay([acik], L).durum, 'bekliyor');
 });
@@ -303,5 +307,52 @@ t('tek kural: karar yeşil değilse skor A/A+ olmaz, canlı 1S skoru da açar', 
   // ters dominance skorun rejim puanını düşürür
   var d = H.sinyalSkoru(c, { mod: 'Temkinli', dominans: { usdt: { h4: 'yukari' } } }, { analizSaat: 2 });
   assert(d.skor < s.skor); assert(/dominance/.test(d.eksik.join()));
+});
+
+t('trendEma: tek trend tanımı', function () {
+  var yuk = [], dus = [], i;
+  for (i = 0; i < 80; i++) { yuk.push({ close: 100 + i }); dus.push({ close: 200 - i }); }
+  assert.strictEqual(H.trendEma(yuk), 'yukari'); assert.strictEqual(H.trendEma(dus), 'asagi');
+  assert.strictEqual(H.trendEma(yuk.slice(0, 40)), null);
+  // yükselişten sonra sert düşüş: kapanış EMA50 altına indi ama EMA20 hâlâ üstte -> yatay
+  var don = yuk.slice(); for (i = 0; i < 6; i++) don.push({ close: 150 - i * 4 });
+  assert.strictEqual(H.trendEma(don), 'yatay');
+});
+t('pusula: aynı anda tek yön', function () {
+  var dm = function (u, b) { return { usdt: { deger: 6.7, h4: u, d: 'yatay' }, btc: { deger: 60, h4: b, d: 'yatay' } }; };
+  assert.strictEqual(H.pusula(null), null); assert.strictEqual(H.pusula({ mod: 'Temkinli' }), null); // veri yoksa kural uygulanmaz
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yukari', h4: 'yukari' }, dominans: dm('yukari', 'yukari') }).yon, 'long'); // BTC trendi önce gelir
+  assert.strictEqual(H.pusula({ btcTf: { d: 'asagi', h4: 'asagi' } }).yon, 'short');
+  // BTC yatay: dominans karar verir
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yatay', h4: 'yatay' }, dominans: dm('asagi', 'yatay') }).yon, 'long');
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yatay', h4: 'yatay' }, dominans: dm('asagi', 'yukari') }).yon, null);
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yatay', h4: 'asagi' }, dominans: dm('yukari', 'yatay') }).yon, 'short');
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yatay', h4: 'yatay' }, dominans: dm('yatay', 'asagi') }).yon, 'long');
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yatay', h4: 'yatay' }, dominans: dm('yatay', 'yatay') }).yon, null);
+  assert.strictEqual(H.pusula({ btcTf: {} }).yon, null);
+});
+t('karar: pusulaya ve açık işleme ters plan kırmızı, skor veto', function () {
+  var L = { yon: 'long', giris: [100, 102], stop: 97, tp1: 110, tp2: 115 };
+  var c = { coin: 'TIA', durum: 'long', plan: L, fiyat: 101, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' }, funding: 0.0001 };
+  var kisa = { mod: 'Temkinli', btcTf: { d: 'asagi', h4: 'asagi' } }, uzun = { mod: 'Temkinli', btcTf: { d: 'yukari', h4: 'yukari' } };
+  var k = H.karar(c, kisa, { analizSaat: 1 });
+  assert.strictEqual(k.renk, 'kirmizi'); assert(k.engel); assert(/Piyasa yönü SHORT/.test(k.neden));
+  assert.strictEqual(H.sinyalSkoru(c, kisa, { analizSaat: 1 }).veto, k.neden);
+  assert.strictEqual(H.karar(c, uzun, { analizSaat: 1 }).renk, 'yesil');
+  k = H.karar(c, { mod: 'Temkinli', btcTf: { d: 'yatay', h4: 'yatay' } }, { analizSaat: 1 });
+  assert.strictEqual(k.renk, 'kirmizi'); assert(/belirsiz/.test(k.neden));
+  k = H.karar(c, uzun, { analizSaat: 1, acikYon: { long: 0, short: 2 } });
+  assert.strictEqual(k.renk, 'kirmizi'); assert(/Açık SHORT/.test(k.neden));
+  assert.strictEqual(H.karar(c, uzun, { analizSaat: 1, acikYon: { long: 1, short: 0 } }).renk, 'yesil');
+});
+t('planHesap: kaldıraç 5x-10x, likidasyon stopun 2 katı ötesinde', function () {
+  var h = H.planHesap({ yon: 'long', giris: [99, 101], stop: 98, tp1: 104 }); // stop %2: pozisyon %50
+  assert.strictEqual(h.kal, 5); assert.strictEqual(h.maxKal, 10); assert(h.kalUygun);
+  h = H.planHesap({ yon: 'long', giris: [99, 101], stop: 92, tp1: 115 }); // stop %8: en fazla 6x
+  assert.strictEqual(h.maxKal, 6); assert.strictEqual(h.kal, 5);
+  h = H.planHesap({ yon: 'long', giris: [99.9, 100.1], stop: 99.85, tp1: 100.5 }); // stop %0,15: pozisyon %667 -> 7x
+  assert.strictEqual(h.kal, 7); assert(h.kalUygun);
+  h = H.planHesap({ yon: 'long', giris: [99.95, 100.05], stop: 99.92, tp1: 100.3 }); // stop %0,08: 13x gerekir
+  assert(!h.kalUygun);
 });
 console.log(n + ' test geçti');

@@ -171,7 +171,7 @@ body.kilit{overflow:hidden}
   .ys-deg{text-align:right;font-size:12px;grid-column:3}
   main{max-width:none;margin:0;padding:18px 24px 24px;gap:16px}
   .geri{display:none}
-  .kutular{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .kutular{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
   .kutu{display:grid;gap:2px;background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);padding:14px 16px}
   .k-et{font-size:12px;color:var(--sonuk);text-transform:uppercase;letter-spacing:.05em}
   .k-deger{font:700 24px/1.25 var(--f-baslik)}
@@ -446,3 +446,28 @@ details.piyasa>p{margin:0;padding:0 14px 12px;font-size:13px;color:var(--sonuk)}
 .karne .kv b{color:var(--yazi);font-weight:700} .karne .kv[style] b{color:inherit}
 .karne .kv{white-space:nowrap}
 .kaynak-rozet{display:inline-flex;align-items:center;font:600 10.5px/1 var(--f-metin);padding:3px 6px;border-radius:6px;white-space:nowrap;color:var(--mavi);background:color-mix(in srgb,var(--mavi) 15%,transparent);margin-left:4px}
+
+/* Yön bandı (21 Eki sadeleştirme): bugünün tek işlem yönü en üstte, büyük ve renkli */
+details.yon-bant{border-left:4px solid var(--uzak)}
+details.yon-bant.yb-long{border-left-color:var(--long);background:color-mix(in srgb,var(--long) 9%,var(--yuzey))}
+details.yon-bant.yb-short{border-left-color:var(--short-yon);background:color-mix(in srgb,var(--short-yon) 9%,var(--yuzey))}
+details.yon-bant>summary{display:grid;grid-template-columns:1fr auto;grid-template-areas:"et ok" "yon ok" "alt ok";row-gap:2px;padding:12px 16px}
+details.yon-bant>summary::after{grid-area:ok;align-self:center}
+.yb-et{grid-area:et;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--sonuk)}
+.yb-yon{grid-area:yon;font:700 20px/1.25 var(--f-baslik);color:var(--bekle)}
+.yb-long .yb-yon{color:var(--long)} .yb-short .yb-yon{color:var(--short-yon)}
+.yb-alt{grid-area:alt;font-size:13px;color:var(--sonuk)}
+.yb-ic{padding:0 16px 12px;font-size:13px;color:var(--sonuk)}
+.yb-ic p{margin:0 0 8px}
+.yb-kv{display:flex;flex-wrap:wrap;gap:4px 16px;margin-bottom:8px}
+.yb-kv .kv b{color:var(--yazi);font-weight:600}
+
+/* Coin detayında ikincil bilgiler tek açılır bölümde */
+details.ayrinti{display:grid;gap:12px}
+details.ayrinti>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--yuzey);border:1px solid var(--cizgi);border-radius:var(--r);font:600 15px var(--f-baslik)}
+details.ayrinti>summary::-webkit-details-marker{display:none}
+details.ayrinti>summary span{font:400 12.5px var(--f-metin);color:var(--sonuk)}
+details.ayrinti>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--sonuk);border-bottom:2px solid var(--sonuk);transform:rotate(45deg);transition:transform .15s}
+details.ayrinti[open]>summary::after{transform:rotate(225deg)}
+details.ayrinti[open]>summary{margin-bottom:12px}
+details.ayrinti>section+section{margin-top:12px}

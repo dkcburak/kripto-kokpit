@@ -1,0 +1,33 @@
+# Tek yön kuralı backtest'i (test/backtest-yon.js). MEXC açık verisi; anahtar yok, emir yok.
+# Elle çalıştırılır ya da bu dosya / script değişince çalışır. Sonuç iş kaydına (log) yazılır.
+name: backtest-yon
+
+on:
+  workflow_dispatch:
+    inputs:
+      gun:
+        description: 'Kaç gün geriye'
+        default: '180'
+  push:
+    paths:
+      - 'test/backtest-yon.js'
+      - '.github/workflows/backtest-yon.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Testler
+        run: node test/hesap.test.js && node test/tarayici.test.js
+      - name: Backtest
+        run: node test/backtest-yon.js "${{ github.event.inputs.gun || '180' }}"
