@@ -306,7 +306,6 @@ t('tek kural: karar yeşil değilse skor A/A+ olmaz, canlı 1S skoru da açar', 
   var d = H.sinyalSkoru(c, { mod: 'Temkinli', dominans: { usdt: { h4: 'yukari' } } }, { analizSaat: 2 });
   assert(d.skor < s.skor); assert(/dominance/.test(d.eksik.join()));
 });
-console.log(n + ' test geçti');
 
 t('trendEma: tek trend tanımı', function () {
   var yuk = [], dus = [], i;
@@ -354,3 +353,4 @@ t('planHesap: kaldıraç 5x-10x, likidasyon stopun 2 katı ötesinde', function 
   h = H.planHesap({ yon: 'long', giris: [99.95, 100.05], stop: 99.92, tp1: 100.3 }); // stop %0,08: 13x gerekir
   assert(!h.kalUygun);
 });
+console.log(n + ' test geçti');
