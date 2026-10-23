@@ -345,6 +345,31 @@ t('karar: pusulaya ve açık işleme ters plan kırmızı, skor veto', function 
   assert.strictEqual(k.renk, 'kirmizi'); assert(/Açık SHORT/.test(k.neden));
   assert.strictEqual(H.karar(c, uzun, { analizSaat: 1, acikYon: { long: 1, short: 0 } }).renk, 'yesil');
 });
+t('pusula: BTC 4S EMA20-EMA50 sıkışıksa (%0,5 altı) yön yok; trend aynı yönde olsa da plan kırmızı, sinyal veto', function () {
+  var L = { yon: 'long', giris: [100, 102], stop: 97, tp1: 110, tp2: 115 };
+  var c = { coin: 'TIA', durum: 'long', plan: L, fiyat: 101, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' }, funding: 0.0001 };
+  var sikisik = { mod: 'Temkinli', btcTf: { d: 'yukari', h4: 'yukari', h4Fark: 0.24 } }, genis = { mod: 'Temkinli', btcTf: { d: 'yukari', h4: 'yukari', h4Fark: 0.8 } };
+  var p = H.pusula(sikisik); assert.strictEqual(p.yon, null); assert(p.sikisik); assert(/sıkışık/.test(p.neden));
+  assert.strictEqual(H.pusula(genis).yon, 'long');
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yukari', h4: 'yukari', h4Fark: -0.49 } }).yon, null);
+  assert.strictEqual(H.pusula({ btcTf: { d: 'yukari', h4: 'yukari' } }).yon, 'long', 'fark yoksa eski kural');
+  var k = H.karar(c, sikisik, { analizSaat: 1 }); assert.strictEqual(k.renk, 'kirmizi'); assert(k.engel);
+  assert.strictEqual(H.sinyalSkoru(c, sikisik, { analizSaat: 1 }).veto, k.neden);
+  assert.strictEqual(H.karar(c, genis, { analizSaat: 1 }).renk, 'yesil');
+  assert.strictEqual(H.PUSULA_MIN_FARK, 0.5);
+});
+t('aynı yön sınırı: aynı yönde 2 açık işlem varken yeni plan sarı, skor en fazla B', function () {
+  var L = { yon: 'long', giris: [100, 102], stop: 97, tp1: 110, tp2: 115 };
+  var c = { coin: 'TIA', durum: 'long', plan: L, fiyat: 101, tf: { d: 'yukari', h4: 'yukari', h1: 'onay' }, funding: 0.0001,
+    m15: { rsi: 55, ema9: 101, ema21: 100.5, hacim: 2, hacimOrt: 1, kapanis: 101 } };
+  var uzun = { mod: 'Temkinli', btcTf: { d: 'yukari', h4: 'yukari', h4Fark: 1 } };
+  assert.strictEqual(H.karar(c, uzun, { analizSaat: 1, acikYon: { long: 1, short: 0 } }).renk, 'yesil');
+  var k = H.karar(c, uzun, { analizSaat: 1, acikYon: { long: 2, short: 0 } });
+  assert.strictEqual(k.renk, 'sari'); assert(k.eksik.some(function (e) { return /aynı yönde 2 açık işlem/.test(e); }));
+  var s1 = H.sinyalSkoru(c, uzun, { analizSaat: 1, acikYon: { long: 1, short: 0 } }), s2 = H.sinyalSkoru(c, uzun, { analizSaat: 1, acikYon: { long: 2, short: 0 } });
+  assert(s1.sinif === 'A' || s1.sinif === 'A+', s1.sinif); assert.strictEqual(s2.sinif, 'B');
+  assert.strictEqual(H.AYNI_YON_SINIR, 2);
+});
 t('planHesap: kaldıraç 5x-10x, likidasyon stopun 2 katı ötesinde', function () {
   var h = H.planHesap({ yon: 'long', giris: [99, 101], stop: 98, tp1: 104 }); // stop %2: pozisyon %50
   assert.strictEqual(h.kal, 5); assert.strictEqual(h.maxKal, 10); assert(h.kalUygun);

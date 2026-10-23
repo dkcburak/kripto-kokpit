@@ -5,6 +5,11 @@
   var KAL_MIN = 5, KAL_MAX = 10; // önerilen kaldıraç aralığı; likidasyon stopun en az 2 katı uzakta kalır
   var UCRET = 0.001;  // giriş+çıkış ücret ve kayma payı (temkinli, işlem değerinin %0,1'i; MEXC tarifesi doğrulanmalı)
   var ESKI_SAAT = 13; // bundan eski analizle "Girişe uygun" denmez (akşam 19:30 -> sabah 08:00 arası 12,5 saat)
+  // Sıkışık piyasa (23 Eki denetimi): BTC 4S EMA20 ile EMA50 arası fiyatın %0,5'inden azsa trend yok sayılır, piyasa yönü verilmez.
+  // 17-22 Eki'de girilen 13 planın 8'i bu eşiğin altında açıldı: 1 Hedef 1, 7 stop. Eşiğin üstünde: 2 Hedef 1, 3 stop.
+  var PUSULA_MIN_FARK = 0.5;
+  // Aynı yönde aynı anda en fazla bu kadar açık işlem varken yeni sinyal yok (20 Eki: 5 short birden = tek BTC bahsi x5).
+  var AYNI_YON_SINIR = 2;
 
   function sayi(x) { return typeof x === 'number' && isFinite(x) && x > 0; }
 
@@ -63,6 +68,10 @@
     if (!piyasa || !piyasa.btcTf || typeof piyasa.btcTf !== 'object') return null;
     var b = piyasa.btcTf, dm = piyasa.dominans || {}, u = dm.usdt && dm.usdt.h4, bd = dm.btc && dm.btc.h4;
     var ad = { yukari: 'yukarı', asagi: 'aşağı', yatay: 'yatay' };
+    // b.h4Fark: BTC 4S (EMA20 - EMA50) / fiyat, yüzde (sunucu canlı yazar). Sıkışıksa yön yok: trend sistemi yatay piyasada çalışmaz.
+    if (typeof b.h4Fark === 'number' && isFinite(b.h4Fark) && Math.abs(b.h4Fark) < PUSULA_MIN_FARK) {
+      return { yon: null, neden: 'BTC 4S sıkışık (EMA20-EMA50 %' + (Math.round(Math.abs(b.h4Fark) * 100) / 100).toString().replace('.', ',') + ' < %' + String(PUSULA_MIN_FARK).replace('.', ',') + ') · yeni plan yok', sikisik: true };
+    }
     if (b.d && b.d === b.h4 && b.d !== 'yatay') return { yon: b.d === 'yukari' ? 'long' : 'short', neden: 'BTC 1G ve 4S ' + ad[b.d] };
     var btc = 'BTC ' + (b.d || b.h4 ? '1G ' + (ad[b.d] || '?') + ', 4S ' + (ad[b.h4] || '?') : 'trendi bilinmiyor');
     if (u === 'asagi') return bd === 'yukari' ? { yon: null, neden: btc + '; USDT.D düşüyor ama BTC.D yükseliyor' } : { yon: 'long', neden: btc + '; USDT.D düşüyor' };
@@ -173,6 +182,7 @@
     if (h.r1Net < 1.5 - 1e-9) tek.push('ücret sonrası kazanç/risk ' + (Math.floor(h.r1Net * 100) / 100).toFixed(2).replace('.', ',') + ' (en az 1,5)');
     if (!h.kalUygun) tek.push(KAL_MAX + 'x sınırında stop çok yakın');
     if (ek && typeof ek.analizSaat === 'number' && ek.analizSaat > ESKI_SAAT) tek.push('analiz ' + Math.floor(ek.analizSaat) + ' saat önce');
+    if (ek && ek.acikYon && ek.acikYon[yon] >= AYNI_YON_SINIR) tek.push('aynı yönde ' + ek.acikYon[yon] + ' açık işlem var (sınır ' + AYNI_YON_SINIR + ')');
     // Temel
     var tem = [], tersHaber = yon === 'long' ? 'Olumsuz' : 'Olumlu';
     (c.haberler || []).forEach(function (h) { if (h && h.etki === 'Yüksek' && h.yon === tersHaber && tem.indexOf('ters yönde önemli haber') < 0) tem.push('ters yönde önemli haber'); });
@@ -592,6 +602,6 @@
     return o;
   }
 
-  var dis = { RISK_TAVAN: RISK_TAVAN, KAL_MIN: KAL_MIN, KAL_MAX: KAL_MAX, emaSon: emaSon, trendEma: trendEma, pusula: pusula, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, dominansEngeli: dominansEngeli, h1Onay: h1Onay, ESKI_SAAT: ESKI_SAAT, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT, haberSentiment: haberSentiment, haberTazelik: haberTazelik, sinyalSkoruHaber: sinyalSkoruHaber, HABER_AGIRLIK: HABER_AGIRLIK };
+  var dis = { RISK_TAVAN: RISK_TAVAN, PUSULA_MIN_FARK: PUSULA_MIN_FARK, AYNI_YON_SINIR: AYNI_YON_SINIR, KAL_MIN: KAL_MIN, KAL_MAX: KAL_MAX, emaSon: emaSon, trendEma: trendEma, pusula: pusula, UCRET: UCRET, planGecerli: planGecerli, planSinif: planSinif, dominansEngeli: dominansEngeli, h1Onay: h1Onay, ESKI_SAAT: ESKI_SAAT, analizYasi: analizYasi, planHesap: planHesap, girisDurumu: girisDurumu, karar: karar, pozisyonHesap: pozisyonHesap, toplamRisk: toplamRisk, coinTemizle: coinTemizle, guvenliUrl: guvenliUrl, rsiSeri: rsiSeri, turevHesap: turevHesap, likidasyonHesap: likidasyonHesap, likidasyonDilim: likidasyonDilim, binanceSembol: binanceSembol, sinyalSkoru: sinyalSkoru, m15Zamanlama: m15Zamanlama, SKOR_ESIK: SKOR_ESIK, SKOR_AGIRLIK: SKOR_AGIRLIK, atrHesap: atrHesap, atrStopTp: atrStopTp, sinyalSkoruAtr: sinyalSkoruAtr, trSeri: trSeri, ATR_PERIYOT: ATR_PERIYOT, haberSentiment: haberSentiment, haberTazelik: haberTazelik, sinyalSkoruHaber: sinyalSkoruHaber, HABER_AGIRLIK: HABER_AGIRLIK };
   if (typeof module !== 'undefined' && module.exports) module.exports = dis; else kok.DKC_HESAP = dis;
 })(this);
