@@ -137,6 +137,17 @@ async function calis() {
   });
   var tablo = Object.keys(sonuc).map(function (k) { var r = sonuc[k]; return [k, r.islem, '%' + r.isabet, r.ortR, r.toplamR, r.maxDususR, r.artiAy, r.tersAyniAnda].join(' | '); });
   console.log('TABLO kural | işlem | isabet | ort R | toplam R | en büyük düşüş R | artı ay | ters aynı anda\n' + tablo.join('\n'));
+  // Tarama (23 Eki): stop mesafesi ve giriş bölgesi genişliği, canlı kural yaklaşığı (yeni+onay+hedef2R) üzerinde
+  var A0 = JSON.parse(JSON.stringify(T.AYAR)), tarama = [];
+  [1, 1.5, 2].forEach(function (st) {
+    [0.25, 0.5].forEach(function (bo) {
+      T.AYAR.stopAtr = st; T.AYAR.bolgeAtr = bo;
+      var ad = hazirla(veri), r = simule(veri, ad, 'yeni', { onay: true, hedefR: 2 });
+      tarama.push(['stopAtr ' + st + ' bolgeAtr ' + bo, r.islem, '%' + r.isabet, r.ortR, r.toplamR, r.maxDususR, r.artiAy].join(' | '));
+    });
+  });
+  Object.keys(A0).forEach(function (k) { T.AYAR[k] = A0[k]; });
+  console.log('TARAMA ayar | işlem | isabet | ort R | toplam R | en büyük düşüş R | artı ay\n' + tarama.join('\n'));
   var btcZaman = Object.keys(adim.BTC).map(Number), yonlu = btcZaman.filter(function (t) { return pusulaBtc(adim.BTC[t].tf); }).length;
   console.log('Dönem: ' + GUN + ' gün, ' + Object.keys(veri).length + ' coin. BTC yönlü (1G=4S) zaman: %' + Math.round(yonlu / btcZaman.length * 100));
   console.log('SONUC ' + JSON.stringify(sonuc, null, 1));
