@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KasaNot">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://generativelanguage.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>KasaNot</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="ikon-180.png">
+<link rel="icon" href="ikon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="ust"><h1 id="baslik">KasaNot</h1><a class="ayar-d" href="#/ayar" aria-label="Ayarlar">⚙</a></header>
+<main id="icerik" aria-live="polite"></main>
+<nav class="alt" id="alt">
+  <a href="#/ana" data-s="ana"><i>⌂</i>Ana</a>
+  <a href="#/cariler" data-s="cariler"><i>☰</i>Cariler</a>
+  <a href="#/ekle" data-s="ekle" class="ekle"><i>＋</i>Belge ekle</a>
+  <a href="#/urunler" data-s="urunler"><i>₺</i>Ürünler</a>
+  <a href="#/personel" data-s="personel"><i>☺</i>Personel</a>
+</nav>
+<dialog id="pencere"></dialog>
+<div id="bildirim" role="status"></div>
+<script src="mantik.js"></script>
+<script src="db.js"></script>
+<script src="okuma.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
