@@ -21,6 +21,7 @@
     return e;
   }
   function ekle(e, c) {
+    if (arguments.length > 2) { for (var i = 1; i < arguments.length; i++) ekle(e, arguments[i]); return; }
     if (c == null || c === false) return;
     if (Array.isArray(c)) c.forEach(function (x) { ekle(e, x); });
     else e.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
@@ -118,6 +119,7 @@
           h('div', null, h('b', null, para(alacak)), h('span', null, 'Alacağımız')),
           h('div', null, h('b', null, String(S.cariler.length)), h('span', null, 'Cari')),
           h('div', null, h('b', null, String(bek)), h('span', null, 'Bekleyen')))),
+      !BULUT.hazir() && S.hareketler.length ? h('div', { class: 'not' }, ik('alert'), h('span', null, 'Verileriniz yalnız bu cihazda duruyor. ', h('a', { href: '#/ayar' }, 'Bulut hesabı açın'), '; telefon ve bilgisayar aynı veriyi görsün, veri kaybolmasın.')) : null,
       !a.gemini ? h('div', { class: 'not b' }, ik('alert'), h('span', null, 'Fotoğraf ve PDF okumak için ', h('a', { href: '#/ayar' }, 'Ayarlar'), '\'dan ücretsiz Gemini anahtarını girin. E-fatura XML dosyaları anahtarsız okunur.')) : null,
       bek ? h('a', { class: 'kart satir', href: '#/ekle' }, h('div', { class: 'ikon-d u' }, ik('clock')), h('div', { class: 'orta' }, h('b', null, bek + ' belge onayınızı bekliyor'), h('span', { class: 'soluk' }, 'Kontrol edip onaylayın'))) : null,
       h('div', { class: 'hizli' },
@@ -294,7 +296,7 @@
     }
 
     var onizleme = h('div');
-    DB.al('dosyalar', bk.dosyaId).then(function (d) {
+    DB.dosyaAl(bk.dosyaId).then(function (d) {
       if (!d || !d.blob) return;
       var url = URL.createObjectURL(d.blob);
       if (/^image\//.test(d.tip)) onizleme.appendChild(h('img', { class: 'onizle', src: url, alt: 'Belge', onclick: function () { pencere([h('img', { src: url, alt: 'Belge' }), h('div', { class: 'yan' }, h('button', { onclick: kapat }, 'Kapat'))]); } }));
@@ -365,7 +367,7 @@
       var ic = [h('h2', null, TUR_AD[x.tur] + ' · ' + para(x.tutar)), h('p', { class: 'soluk' }, tarihTr(x.tarih) + (x.belgeNo ? ' · ' + x.belgeNo : '') + (x.aciklama ? ' · ' + x.aciklama : ''))];
       var ek = h('div');
       ic.push(ek);
-      if (x.dosyaId) DB.al('dosyalar', x.dosyaId).then(function (d) {
+      if (x.dosyaId) DB.dosyaAl(x.dosyaId).then(function (d) {
         if (!d || !d.blob) return;
         var url = URL.createObjectURL(d.blob);
         ek.appendChild(/^image\//.test(d.tip) ? h('img', { src: url, alt: 'Belge' }) : h('a', { class: 'dugme', href: url, target: '_blank', rel: 'noopener' }, ik('file'), 'Belgeyi aç'));
@@ -521,6 +523,7 @@
       f.text().then(function (t) { var j = JSON.parse(t); onay('Mevcut tüm veri silinip yedekteki veri yüklensin mi?', function () { DB.iceAktar(j).then(function () { bildir('Yedek yüklendi'); yonlendir(); }, function (er) { bildir(er.message); }); }, true); }).catch(function () { bildir('Geçersiz yedek dosyası.'); });
     } });
     return h('div', null,
+      bulutKart(),
       h('div', { class: 'kart' }, h('b', null, 'İşletme'), h('label', null, 'Ünvan'), un, h('label', null, 'Vergi no (VKN)'), vk),
       h('div', { class: 'kart' }, h('b', null, 'Belge okuma (Gemini)'), h('label', null, 'Gemini API anahtarı'), gm,
         h('p', { class: 'soluk' }, 'Anahtar yalnız bu cihazda saklanır, sadece Google\'a okuma isteğiyle gider. Ücretsiz katmanda gönderilen belgeler Google tarafından ürün geliştirmede kullanılabilir (ai.google.dev/gemini-api/docs/pricing). Gerçek müşteri belgeleri için ücretli katman önerilir.')),
@@ -543,7 +546,74 @@
           h('button', { class: 'tehlike', onclick: function () { onay('TÜM veriler silinsin mi? Geri alınamaz.', function () { Promise.all(DB.depolar.map(function (d) { return DB.temizle(d); })).then(function () { bildir('Tüm veri silindi'); git('#/ana'); }); }, true); } }, 'Tüm veriyi sil'))));
   }
 
+  // ---------- BULUT ----------
+  var DURUM_AD = { bagsiz: 'Yalnız bu cihaz', tamam: 'Eşitlendi', esitleniyor: 'Eşitleniyor…', bekliyor: 'Bekliyor', cevrimdisi: 'Çevrimdışı', hata: 'Eşitleme hatası' };
+  function durumYaz() {
+    var d = BULUT.durum, e = $('bulut-d'), ad = BULUT.hazir() ? d.ad : 'bagsiz';
+    e.className = 'bulut-d ' + ad; e.textContent = DURUM_AD[ad] || '';
+    var s = $('bulut-ozet'); if (s) s.textContent = (DURUM_AD[ad] || '') + (d.son ? ' · ' + new Date(d.son).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '') + (d.kuyruk ? ' · ' + d.kuyruk + ' değişiklik bekliyor' : '') + (d.hata ? ' · ' + d.hata : '');
+  }
+  function ilkEsitleme() {
+    return Promise.all([BULUT.yerelSayisi(), BULUT.bulutSayisi()]).then(function (n) {
+      var yerel = n[0], bulut = n[1];
+      if (!yerel) return BULUT.esitle();
+      if (!bulut) return BULUT.yerelleriKuyrugaAl().then(function () { return BULUT.esitle(); });
+      return new Promise(function (ok) {
+        pencere([h('h2', null, 'Veri çakışması'), h('p', null, 'Bu cihazda ' + yerel + ' kayıt, bulutta zaten veri var. Bu cihazdaki kayıtlar silinip buluttaki veri yüklensin mi? (Bu cihazdaki veriyi saklamak istiyorsanız önce Ayarlar > Yedeği indir ile yedek alın.)'),
+          h('div', { class: 'yan' }, h('button', { class: 'tehlike', onclick: function () { kapat(); BULUT.yerelleriSil().then(function () { return BULUT.esitle(); }).then(ok); } }, 'Evet, buluttakini yükle'),
+            h('button', { onclick: function () { kapat(); BULUT.cikis().then(ok); } }, 'Vazgeç, bağlanma'))]);
+      });
+    });
+  }
+  function girisSonrasi() {
+    return BULUT.isletmem().then(function (is) {
+      if (!is) { yonlendir(); return; }
+      BULUT.baglan(is); return ilkEsitleme().then(function () { bildir('Bulut hesabına bağlandı'); yonlendir(); });
+    }).catch(function (e) { bildir(e.message); });
+  }
+  function bulutKart() {
+    var o = BULUT.oturum(), kart = h('div', { class: 'kart' });
+    ekle(kart, h('b', null, 'Bulut hesabı'));
+    if (!o) {
+      var em = h('input', { type: 'email', placeholder: 'ornek@eposta.com', autocomplete: 'email' }), sf = h('input', { type: 'password', placeholder: 'En az 8 karakter', autocomplete: 'current-password' }), mesaj = h('div');
+      function gonder(kayit) {
+        var e = em.value.trim(), s = sf.value;
+        if (!e || !s) return bildir('E-posta ve şifre girin.');
+        mesaj.textContent = '';
+        (kayit ? BULUT.kayitOl(e, s) : BULUT.giris(e, s)).then(function (r) {
+          if (r && r.onayGerekli) { ekle(mesaj, h('div', { class: 'not i' }, ik('check'), h('span', null, 'Onay e-postası gönderildi. Gelen kutunuzdaki bağlantıya basın, sonra buradan "Giriş yap" deyin.'))); return; }
+          return girisSonrasi();
+        }).catch(function (er) { ekle(mesaj, uyari(er.message, 'k')); });
+      }
+      ekle(kart, h('p', { class: 'soluk' }, 'Hesap açınca telefon ve bilgisayarda aynı veriyi görürsünüz; veri bulutta yedeklenir. Belge fotoğrafları ve kayıtlar yalnız sizin işletmenize aittir.'),
+        h('label', null, 'E-posta'), em, h('label', null, 'Şifre'), sf, mesaj,
+        h('div', { class: 'yan' }, h('button', { class: 'birinci', onclick: function () { gonder(false); } }, 'Giriş yap'), h('button', { onclick: function () { gonder(true); } }, 'Kayıt ol')));
+      return kart;
+    }
+    var is = BULUT.isletme();
+    if (!is) {
+      var ad = h('input', { value: ayar().unvan || '', placeholder: 'İşletme adı' });
+      ekle(kart, h('p', { class: 'soluk' }, o.kullanici.email + ' olarak girildi. Şimdi işletmenizi kurun.'), h('label', null, 'İşletme adı'), ad,
+        h('div', { class: 'yan' }, h('button', { class: 'birinci', onclick: function () {
+          if (!ad.value.trim()) return bildir('İşletme adı girin.');
+          BULUT.isletmem().then(function (var1) { return var1 || BULUT.isletmeOlustur(ad.value.trim()).then(function () { return BULUT.isletmem(); }); }).then(function (v) { BULUT.baglan(v); return ilkEsitleme(); }).then(function () { yonlendir(); }).catch(function (er) { bildir(er.message); });
+        } }, 'İşletmeyi kur'), h('button', { onclick: function () { BULUT.cikis().then(yonlendir); } }, 'Çıkış')));
+      return kart;
+    }
+    var liste = h('div', { class: 'soluk' }), ue = h('input', { type: 'email', placeholder: 'Ekip arkadaşının e-postası' });
+    function listele() { BULUT.uyeler().then(function (u) { liste.textContent = 'Ekip: ' + u.map(function (x) { return x.email + (x.rol === 'sahip' ? ' (sahip)' : ''); }).join(', '); }).catch(function () {}); }
+    ekle(kart, h('div', { class: 'soluk' }, o.kullanici.email + ' · ' + is.ad), h('div', { id: 'bulut-ozet', class: 'soluk', style: 'margin-top:4px' }), liste,
+      h('div', { class: 'yan' }, h('button', { onclick: function () { BULUT.esitle(); } }, 'Şimdi eşitle'), h('button', { onclick: function () { onay('Bu cihazdan çıkış yapılsın mı? Bu cihazdaki kopya kalır, bulutla bağlantısı kesilir.', function () { BULUT.cikis().then(yonlendir); }); } }, 'Çıkış yap')),
+      is.rol === 'sahip' ? h('div', null, h('label', null, 'Ekibe kişi ekle (önce uygulamada kayıt olmuş olmalı)'), ue,
+        h('div', { class: 'yan' }, h('button', { onclick: function () { if (!ue.value.trim()) return bildir('E-posta girin.'); BULUT.uyeEkle(ue.value.trim()).then(function () { ue.value = ''; bildir('Eklendi'); listele(); }).catch(function (er) { bildir(er.message); }); } }, 'Ekle'))) : null);
+    listele(); setTimeout(durumYaz, 0);
+    return kart;
+  }
+
   // ---------- başlangıç ----------
+  BULUT.dinle(durumYaz);
+  BULUT.degisti = function () { var a = document.activeElement; if (!$('pencere').open && !/^#\/(bekleyen|ayar)/.test(location.hash) && !(a && /INPUT|SELECT|TEXTAREA/.test(a.tagName))) yonlendir(); };
+  durumYaz();
   window.addEventListener('hashchange', yonlendir);
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});

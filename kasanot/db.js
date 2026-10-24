@@ -1,7 +1,7 @@
 // KasaNot veri katmanı: IndexedDB (veri yalnız bu cihazda). window.DB
 (function () {
   'use strict';
-  var ADI = 'kasanot', SURUM = 1;
+  var ADI = 'kasanot', SURUM = 2;
   var DEPOLAR = ['cariler', 'hareketler', 'fiyatlar', 'bekleyen', 'dosyalar', 'personel', 'mesai', 'avans'];
   var dbp = null;
 
@@ -13,6 +13,7 @@
         DEPOLAR.forEach(function (d) {
           if (!r.result.objectStoreNames.contains(d)) r.result.createObjectStore(d, { keyPath: 'id', autoIncrement: true });
         });
+        if (!r.result.objectStoreNames.contains('cikis')) r.result.createObjectStore('cikis', { keyPath: 'k' });
       };
       r.onsuccess = function () { ok(r.result); };
       r.onerror = function () { hata(r.error); };
@@ -30,12 +31,40 @@
       });
     });
   }
+  // Cihazlar arası çakışmayı önlemek için kimlik cihazda üretilir (güvenli tamsayı)
+  function yeniId() { return Date.now() * 1000 + Math.floor(Math.random() * 1000); }
   var DB = {
+    // Eşitleme: yazma/silme sonrası çağrılır (bulut.js bağlar)
+    degisimde: null,
     hepsi: function (d) { return islem(d, 'readonly', function (s) { return s.getAll(); }); },
     al: function (d, id) { return islem(d, 'readonly', function (s) { return s.get(id); }); },
-    koy: function (d, kayit) { return islem(d, 'readwrite', function (s) { return s.put(kayit); }); },
-    sil: function (d, id) { return islem(d, 'readwrite', function (s) { return s.delete(id); }); },
-    temizle: function (d) { return islem(d, 'readwrite', function (s) { return s.clear(); }); },
+    // Yerel yazma (eşitlemeyi tetiklemez): bulut verisini uygularken kullanılır
+    koyYerel: function (d, kayit) { return islem(d, 'readwrite', function (s) { return s.put(kayit); }); },
+    silYerel: function (d, id) { return islem(d, 'readwrite', function (s) { return s.delete(id); }); },
+    koy: function (d, kayit) {
+      if (kayit.id == null) kayit.id = yeniId();
+      return DB.koyYerel(d, kayit).then(function (id) { if (DB.degisimde) DB.degisimde(d, id, false); return id; });
+    },
+    sil: function (d, id) {
+      return DB.silYerel(d, id).then(function () { if (DB.degisimde) DB.degisimde(d, id, true); });
+    },
+    temizle: function (d) {
+      return DB.hepsi(d).then(function (x) { return x.reduce(function (p, k) { return p.then(function () { return DB.sil(d, k.id); }); }, Promise.resolve()); });
+    },
+    // Çıkış kuyruğu (henüz buluta gitmemiş değişiklikler)
+    kuyrukEkle: function (d, id, sil) { return islem('cikis', 'readwrite', function (s) { return s.put({ k: d + ':' + id, depo: d, id: id, sil: !!sil }); }); },
+    kuyrukHepsi: function () { return islem('cikis', 'readonly', function (s) { return s.getAll(); }); },
+    kuyrukSil: function (k) { return islem('cikis', 'readwrite', function (s) { return s.delete(k); }); },
+    // Belge dosyası: yerelde yoksa buluttan indirir
+    dosyaAl: function (id) {
+      return DB.al('dosyalar', id).then(function (d) {
+        if (!d || d.blob || !window.BULUT) return d;
+        return BULUT.dosyaIndir(id).then(function (blob) {
+          if (!blob) return d;
+          d.blob = blob; return DB.koyYerel('dosyalar', d).then(function () { return d; });
+        }, function () { return d; });
+      });
+    },
     depolar: DEPOLAR,
     // Yedek: dosyalar (fotoğraflar) hariç tüm veri
     disaAktar: function () {
