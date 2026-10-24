@@ -55,15 +55,24 @@
     });
   }
 
+  var YEDEK_MODEL = 'gemini-2.5-flash-lite';
+  function bekle(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+
   function geminiCagri(blob, anahtar, isletme) {
     return blob.arrayBuffer().then(function (buf) {
       var gov = {
         contents: [{ parts: [{ text: istem(isletme) }, { inline_data: { mime_type: blob.type || 'image/jpeg', data: b64(buf) } }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: SEMA, temperature: 0 }
       };
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar }, body: JSON.stringify(gov)
-      });
+      function dene(model, kalan) {
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar }, body: JSON.stringify(gov)
+        }).then(function (r) {
+          if (r.status >= 500 && kalan > 0) return bekle(1500).then(function () { return dene(kalan === 1 ? YEDEK_MODEL : model, kalan - 1); });
+          return r;
+        });
+      }
+      return dene(MODEL, 2);
     }).then(function (r) {
       if (r.status === 429) throw new Error('Günlük ücretsiz okuma sınırı doldu. Biraz sonra tekrar deneyin ya da belgeyi elle girin.');
       if (r.status === 400 || r.status === 403) throw new Error('Gemini anahtarı geçersiz görünüyor. Ayarlar\'dan kontrol edin.');

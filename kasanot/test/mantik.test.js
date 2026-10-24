@@ -67,4 +67,8 @@ t('Personel ay özeti', () => {
   assert.equal(o.fazlaMesaiUcret, 300); assert.equal(o.odenecek, 19800);
   assert.equal(KN.saatFarki('22:00', '02:00'), 4);
 });
+t('CSV: ondalık virgül, tırnak, formül enjeksiyonu', () => {
+  const c = KN.csv([['Ad', 'Tutar'], ['A;B "x"', 12.5], ['=1+1', 3]]);
+  assert.ok(c.startsWith('﻿')); assert.ok(c.includes('"A;B ""x"""')); assert.ok(c.includes(';12,5')); assert.ok(c.includes("'=1+1"));
+});
 console.log(ok + ' test geçti');

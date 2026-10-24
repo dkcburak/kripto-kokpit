@@ -54,6 +54,15 @@
     if (Math.abs(b) < 0.005) return h('span', { class: 'etiket i' }, 'Kapalı');
     return h('span', { class: b > 0 ? 'pozitif' : 'negatif' }, para(Math.abs(b)) + (b > 0 ? ' borcumuz' : ' alacağımız'));
   }
+  function indir(ad, icerik) {
+    var url = URL.createObjectURL(new Blob([icerik], { type: 'text/csv;charset=utf-8' }));
+    var l = h('a', { href: url, download: ad }); document.body.appendChild(l); l.click(); l.remove();
+  }
+  function ekstreCsv(liste) {
+    var sat = [['Tarih', 'Cari', 'İşlem', 'Belge no', 'Açıklama', 'Tutar', 'Bakiye etkisi']];
+    liste.forEach(function (x) { sat.push([tarihTr(x.tarih), cariAd(x.cariId), TUR_AD[x.tur], x.belgeNo || '', x.aciklama || '', x.tutar, KN.bakiyeEtkisi(x.tur, x.tutar)]); });
+    return KN.csv(sat);
+  }
   function yukle() {
     return Promise.all(Object.keys(S).map(function (k) { return DB.hepsi(k).then(function (x) { S[k] = x; }); }));
   }
@@ -170,7 +179,8 @@
     var b = JSON.parse(JSON.stringify(bk.belge));
     var hTur = b.tur === 'dekont' ? b.yon : b.yon === 'satis' ? 'satis' : 'alis';
     var kap = h('div'), uyarilarKutu = h('div'), kalemKutu = h('div'), cariNot = h('div');
-    var secCari, kopya = h('input', { type: 'checkbox' });
+    var secCari, kopya = h('input', { type: 'checkbox' }), pesin = h('input', { type: 'checkbox' });
+    pesin.checked = b.tur === 'fis';
     var eslesme = KN.cariBul(S.cariler, { vkn: b.karsiVkn, unvan: b.karsiUnvan });
     var yeniSecim = '__yeni';
     var cariSec = h('select', { onchange: function () { cariNotYaz(); } },
@@ -182,7 +192,7 @@
     var belgeNoG = h('input', { value: b.belgeNo, oninput: function () { b.belgeNo = this.value; hesapla(); } });
     var tarihG = h('input', { type: 'date', value: /^\d{4}-\d{2}-\d{2}$/.test(b.tarih) ? b.tarih : '', oninput: function () { b.tarih = this.value; hesapla(); } });
     var toplamG = h('input', { value: b.toplam ? String(b.toplam).replace('.', ',') : '', inputmode: 'decimal', oninput: function () { b.toplam = sayi(this.value); hesapla(); } });
-    var turG = h('select', { onchange: function () { hTur = this.value; b.tur = (hTur === 'odeme' || hTur === 'tahsilat') ? 'dekont' : (b.tur === 'fis' ? 'fis' : 'fatura'); b.yon = hTur; kalemleriCiz(); hesapla(); } },
+    var turG = h('select', { onchange: function () { hTur = this.value; pesinKutu.style.display = (hTur === 'alis' || hTur === 'satis') ? 'flex' : 'none'; b.tur = (hTur === 'odeme' || hTur === 'tahsilat') ? 'dekont' : (b.tur === 'fis' ? 'fis' : 'fatura'); b.yon = hTur; kalemleriCiz(); hesapla(); } },
       [['alis', 'Alış (fatura/fiş aldık)'], ['satis', 'Satış (fatura kestik)'], ['odeme', 'Ödeme yaptık (dekont)'], ['tahsilat', 'Tahsilat aldık (dekont)']].map(function (x) { return h('option', { value: x[0] }, x[1]); }));
     turG.value = hTur;
 
@@ -222,6 +232,7 @@
       });
       ekle(kalemKutu, h('button', { onclick: function () { b.kalemler.push({ ad: '', miktar: 1, birim: '', birimFiyat: 0, tutar: 0 }); kalemleriCiz(); } }, '＋ Kalem ekle'));
     }
+    var pesinKutu = h('label', { style: 'display:flex;gap:8px;align-items:center;margin-top:10px;color:inherit;font-size:15px' }, pesin, 'Peşin ödendi (cariye borç yazılmasın)');
     var mukerrerVar = null;
     function hesapla() {
       uyarilarKutu.textContent = '';
@@ -244,6 +255,9 @@
       var carip = c ? Promise.resolve(c.id) : DB.koy('cariler', { unvan: String(b.karsiUnvan).trim(), vkn: String(b.karsiVkn).replace(/\D/g, ''), tel: '', not: '', olusturma: bugun() });
       carip.then(function (cid) {
         return DB.koy('hareketler', { cariId: cid, tarih: b.tarih, tur: hTur, tutar: b.toplam, belgeNo: b.belgeNo, dosyaId: bk.dosyaId, aciklama: b.aciklama || '', kalemSayisi: b.kalemler.length, kdv: b.kdv || 0 }).then(function (hid) {
+          if (pesin.checked && (hTur === 'alis' || hTur === 'satis')) return DB.koy('hareketler', { cariId: cid, tarih: b.tarih, tur: hTur === 'alis' ? 'odeme' : 'tahsilat', tutar: b.toplam, belgeNo: b.belgeNo, dosyaId: 0, aciklama: 'Peşin', kalemSayisi: 0, pesinDe: hid }).then(function () { return hid; });
+          return hid;
+        }).then(function (hid) {
           var gecmis = S.fiyatlar.slice(), kayitlar = [];
           if (hTur === 'alis') b.kalemler.forEach(function (k) {
             var bf = k.birimFiyat > 0 ? k.birimFiyat : (k.miktar > 0 && k.tutar > 0 ? Math.round(k.tutar / k.miktar * 100) / 100 : 0);
@@ -277,6 +291,7 @@
         h('div', { class: 'iki' }, h('div', null, h('label', null, 'Belge / işlem no'), belgeNoG), h('div', null, h('label', null, 'Tarih'), tarihG)),
         h('label', null, 'Toplam tutar (' + (b.para || 'TRY') + ')'), toplamG,
         kalemKutu, uyarilarKutu,
+        pesinKutu,
         h('label', { style: 'display:flex;gap:8px;align-items:center' }, kopya, 'Mükerrer olsa da yine de kaydet')),
       h('div', { class: 'yan' },
         h('button', { class: 'birinci', style: 'flex:1', onclick: kaydet }, '✓ Onayla ve kaydet'),
@@ -339,7 +354,7 @@
       ic.push(h('div', { class: 'yan' }, h('button', { class: 'tehlike', onclick: function () {
         onay('Bu hareket silinsin mi? Bakiye ve fiyat kayıtları da güncellenir.', function () {
           var fs = S.fiyatlar.filter(function (f) { return f.hareketId === x.id; });
-          Promise.all(fs.map(function (f) { return DB.sil('fiyatlar', f.id); })).then(function () { return DB.sil('hareketler', x.id); }).then(function () { bildir('Silindi'); yonlendir(); });
+          Promise.all(fs.map(function (f) { return DB.sil('fiyatlar', f.id); }).concat(S.hareketler.filter(function (e) { return e.pesinDe === x.id; }).map(function (e) { return DB.sil('hareketler', e.id); }))).then(function () { return DB.sil('hareketler', x.id); }).then(function () { bildir('Silindi'); yonlendir(); });
         }, true);
       } }, 'Hareketi sil'), h('button', { onclick: kapat }, 'Kapat')));
       pencere(ic);
@@ -348,6 +363,7 @@
       h('div', { class: 'kart' }, h('b', null, c.unvan), h('div', { class: 'soluk' }, [c.vkn, c.tel, c.not].filter(Boolean).join(' · ') || 'Ek bilgi yok'),
         h('div', { class: 'sayi' }, bakiyeEtiket(b)),
         h('div', { class: 'yan' }, h('button', { class: 'birinci', onclick: manuel }, 'Ödeme / tahsilat gir'), h('button', { onclick: function () { cariForm(c); } }, 'Düzenle'),
+          hr.length ? h('button', { onclick: function () { indir('ekstre-' + KN.norm(c.unvan).replace(/ /g, '-').slice(0, 30) + '.csv', ekstreCsv(hr.slice().reverse())); } }, 'Ekstre (Excel)') : null,
           !hr.length ? h('button', { class: 'tehlike', onclick: function () { onay('Cari silinsin mi?', function () { DB.sil('cariler', c.id).then(function () { git('#/cariler'); }); }, true); } }, 'Sil') : null)),
       h('h2', null, 'Hareketler'),
       h('div', { class: 'kart' }, hr.length ? hr.map(function (x) {
@@ -502,6 +518,8 @@
             var l = h('a', { href: url, download: 'kasanot-yedek-' + bugun() + '.json' }); document.body.appendChild(l); l.click(); l.remove();
           });
         } }, 'Yedeği indir'), h('label', { class: 'dugme' }, 'Yedekten yükle', dosya),
+          h('button', { onclick: function () { indir('kasanot-hareketler-' + bugun() + '.csv', ekstreCsv(S.hareketler.slice().sort(function (a, b) { return a.tarih < b.tarih ? -1 : 1; }))); } }, 'Tüm hareketler (Excel)'),
+          h('button', { onclick: function () { indir('kasanot-urun-fiyatlari-' + bugun() + '.csv', KN.csv([['Tarih', 'Ürün', 'Cari', 'Birim fiyat', 'Değişim %']].concat(S.fiyatlar.slice().sort(function (a, b) { return a.tarih < b.tarih ? -1 : 1; }).map(function (f) { return [tarihTr(f.tarih), f.ad, cariAd(f.cariId), f.birimFiyat, f.degisim || 0]; })))); } }, 'Ürün fiyatları (Excel)'),
           h('button', { class: 'tehlike', onclick: function () { onay('TÜM veriler silinsin mi? Geri alınamaz.', function () { Promise.all(DB.depolar.map(function (d) { return DB.temizle(d); })).then(function () { bildir('Tüm veri silindi'); git('#/ana'); }); }, true); } }, 'Tüm veriyi sil'))));
   }
 

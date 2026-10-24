@@ -219,7 +219,19 @@
     };
   }
 
-  var api = { norm: norm, benzerlik: benzerlik, cariBul: cariBul, bakiyeEtkisi: bakiyeEtkisi, bakiye: bakiye,
+  // CSV (Excel TR): noktalı virgül ayraç, ondalık virgül, UTF-8 BOM
+  function csv(satirlar) {
+    return '﻿' + satirlar.map(function (r) {
+      return r.map(function (v) {
+        if (typeof v === 'number') return String(v).replace('.', ',');
+        var s = String(v == null ? '' : v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // formül enjeksiyonu
+        return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }).join(';');
+    }).join('\r\n');
+  }
+
+  var api = { csv: csv, norm: norm, benzerlik: benzerlik, cariBul: cariBul, bakiyeEtkisi: bakiyeEtkisi, bakiye: bakiye,
     urunAnahtar: urunAnahtar, fiyatDegisim: fiyatDegisim, mukerrer: mukerrer, tutarlilik: tutarlilik, para: para,
     ublOku: ublOku, geminiBelge: geminiBelge, saatFarki: saatFarki, personelAyOzeti: personelAyOzeti };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.KN = api;
