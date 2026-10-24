@@ -106,3 +106,7 @@ dialog h2{margin-top:0;font-size:17px;text-transform:none;letter-spacing:-.01em;
 }
 .not a{color:inherit;font-weight:650;text-decoration:underline}
 a{color:var(--ana)}
+
+.bulut-d{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--soluk);text-decoration:none;padding:5px 10px;border-radius:999px;background:var(--kart);border:1px solid var(--cizgi);white-space:nowrap}
+.bulut-d::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--soluk)}
+.bulut-d.tamam::before{background:var(--iyi)}.bulut-d.esitleniyor::before,.bulut-d.bekliyor::before{background:var(--vurgu)}.bulut-d.hata::before,.bulut-d.cevrimdisi::before{background:var(--kotu)}
