@@ -232,6 +232,8 @@
       kalemKutu.textContent = '';
       if (hTur === 'odeme' || hTur === 'tahsilat') return;
       ekle(kalemKutu, h('h2', null, 'Ürün / kalemler'));
+      if (hTur !== 'alis') ekle(kalemKutu, h('div', { class: 'not' }, 'Ürün fiyat listesi yalnızca "Alış" belgelerinde tutulur. Ürünlerin listeye girmesi için yukarıdan türü Alış seçin.'));
+      else if (!b.kalemler.some(function (k) { return String(k.ad).trim() && (k.birimFiyat > 0 || k.tutar > 0); })) ekle(kalemKutu, h('div', { class: 'not' }, 'Ürün satırı okunamadı. Ürünler listesine girmesi için aşağıdan "Kalem ekle" ile ürün adı ve fiyatını yazın.'));
       b.kalemler.forEach(function (k, i) {
         var uyar = h('div');
         function fiyatKontrol() {
