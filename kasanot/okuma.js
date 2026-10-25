@@ -74,7 +74,7 @@
         }).map(function (m) { return m.name.replace('models/', ''); });
         ad.sort(function (a, b) { return (surum(b) - surum(a)) || ((/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0)); });
         if (!ad.length) throw new Error('model yok');
-        return { ana: ad[0], yedek: ad.filter(function (x) { return /lite/.test(x); })[0] || ad[ad.length - 1] };
+        return ad;
       });
   }
 
@@ -89,24 +89,36 @@
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar }, body: JSON.stringify(gov)
         });
       }
-      function dene(m, kalan, yeniden) {
-        return istek(m.ana).then(function (r) {
-          if (r.status === 404 && yeniden) {
-            yaz_(ONBELLEK, null);
-            return modelSec(anahtar).then(function (y) { yaz_(ONBELLEK, y); return dene(y, 2, false); });
-          }
-          if (r.status >= 500 && kalan > 0) {
-            return bekle(1500).then(function () { return dene({ ana: kalan === 1 ? m.yedek : m.ana, yedek: m.yedek }, kalan - 1, yeniden); });
-          }
+      var son = '';
+      // Sırayla dene: önbellekteki/varsayılan model, 404 ise anahtarın gördüğü modeller (en yeni önce)
+      function sirada(liste, i) {
+        if (i >= liste.length) return Promise.reject(new Error('Okuma servisi hata verdi (404). Denenen modeller: ' + son));
+        var m = liste[i];
+        return istek(m).then(function (r) {
+          if (r.status >= 500) return bekle(1500).then(function () { return istek(m); });
+          return r;
+        }).then(function (r) {
+          if (r.status === 404 || r.status >= 500) { son += (son ? ', ' : '') + m + ' (' + r.status + ')'; return sirada(liste, i + 1); }
+          if (r.ok) yaz_(ONBELLEK, { ana: m });
           return r;
         });
       }
-      return dene(oku_(ONBELLEK) || { ana: MODEL, yedek: YEDEK_MODEL }, 2, true);
+      var kayitli = oku_(ONBELLEK);
+      var ilk = [kayitli && kayitli.ana ? kayitli.ana : MODEL];
+      return sirada(ilk, 0).catch(function (e) {
+        if (!/404|\(5\d\d\)/.test(e.message)) throw e;
+        yaz_(ONBELLEK, null);
+        return modelSec(anahtar).then(function (liste) { return sirada(liste.slice(0, 5), 0); }, function () { throw e; });
+      });
     }).then(function (r) {
       if (r.status === 429) throw new Error('Günlük ücretsiz okuma sınırı doldu. Biraz sonra tekrar deneyin ya da belgeyi elle girin.');
-      if (r.status === 400 || r.status === 403) throw new Error('Gemini anahtarı geçersiz görünüyor. Ayarlar\'dan kontrol edin.');
-      if (!r.ok) throw new Error('Okuma servisi hata verdi (' + r.status + ').');
-      return r.json();
+      if (r.ok) return r.json();
+      return r.text().then(function (t) {
+        var ayrinti = ''; try { ayrinti = JSON.parse(t).error.message; } catch (e) {}
+        ayrinti = String(ayrinti || '').slice(0, 160);
+        if (/API key/i.test(ayrinti) || r.status === 403) throw new Error('Gemini anahtarı geçersiz görünüyor. Ayarlar\'dan kontrol edin.');
+        throw new Error('Okuma servisi hata verdi (' + r.status + ').' + (ayrinti ? ' ' + ayrinti : ''));
+      });
     }).then(function (j) {
       var t = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
       if (!t || !t[0] || !t[0].text) throw new Error('Belge okunamadı. Daha net bir fotoğraf deneyin.');
