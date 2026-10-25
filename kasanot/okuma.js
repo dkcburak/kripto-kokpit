@@ -60,6 +60,7 @@
 
   var YEDEK_MODEL = 'gemini-2.5-flash-lite';
   var ONBELLEK = 'kn_model';
+  var sonModel = '';
   function bekle(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
   function surum(ad) { var m = /gemini-(\d+(?:\.\d+)?)-flash/.exec(ad); return m ? parseFloat(m[1]) : 0; }
   function oku_(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
@@ -101,7 +102,7 @@
           return r;
         }).then(function (r) {
           if (r.status === 404 || r.status === 429 || r.status >= 500) { sonKod = r.status; son += (son ? ', ' : '') + m + ' (' + r.status + ')'; return sirada(liste, i + 1); }
-          if (r.ok) yaz_(ONBELLEK, { ana: m });
+          if (r.ok) { yaz_(ONBELLEK, { ana: m }); sonModel = m; }
           return r;
         });
       }
@@ -147,6 +148,7 @@
       }).then(function (j) {
         if (j.tur === 'diger') throw new Error('Bu belge fatura, fiş ya da dekonta benzemiyor.');
         var b = KN.geminiBelge(j);
+        b.teknik = { model: sonModel, ham: j };
         if (!b.toplam && b.kalemler.length) b.toplam = Math.round(b.kalemler.reduce(function (t, k) { return t + (k.tutar || k.miktar * k.birimFiyat || 0); }, 0) * 100) / 100;
         return b;
       });
