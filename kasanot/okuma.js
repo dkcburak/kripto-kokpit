@@ -20,17 +20,17 @@
     required: ['tur', 'toplam']
   };
 
-  function istem(isletme) {
+  function istem(isletme, ekstra) {
     return 'Bu bir Türkiye\'de düzenlenmiş muhasebe belgesi (fatura, fiş veya banka dekontu). Alanları belgede yazdığı gibi çıkar, uydurma; okunamayan alanı boş bırak.\n' +
       '- Belge ELLE YAZILMIŞ olabilir (el yazısı fiş, adisyon, ufak defter/kağıt notu). Bu durumda el yazısını elinden geldiğince oku: rakamları ve ürün adlarını tahmin ederek yaz, belge basılı değilse tur = fis olsun, VKN/belgeNo yoksa boş bırak. Toplam yazılı değilse kalem tutarlarını toplayarak toplam ver. Hiçbir şey okuyamazsan bile toplam = 0 yerine en az görebildiğin kalemleri döndür ve guven değerini düşük ver.\n' +
       '- tur: fatura | fis | dekont.\n' +
       '- Tutarlar nokta ondalıklı sayı (1.250,50 -> 1250.5). tarih YYYY-MM-DD.\n' +
       '- fatura/fis: yon = bizim işletmeye göre "alis" (satıcı karşı taraf) veya "satis" (biz kestik). karsiUnvan/karsiVkn = karşı taraf (alışta satıcı). Fişte VKN genelde mağaza vergi no.\n' +
-      '- kalemler: ürün satırları; birimFiyat KDV hariç birim fiyat varsa o, yoksa belgede yazan; tutar satır tutarı. Fişte kalem satırlarını da çıkar.\n' +
+      '- kalemler (ÇOK ÖNEMLİ): belgedeki HER ürün/hizmet satırını ayrı ayrı kalemler dizisine yaz (ad, miktar, birim, birimFiyat, tutar); asla boş bırakma, yalnızca toplamı döndürme. Toplam, Genel toplam, Bakiye, Devir satırları kalem DEĞİLDİR. Satırda sadece ad ve tutar varsa miktar=1, birimFiyat=tutar yaz. birimFiyat KDV hariç birim fiyat varsa o, yoksa belgede yazan; tutar satır tutarı. Fişte kalem satırlarını da çıkar.\n' +
       '- araToplam KDV hariç toplam, kdv toplam KDV, toplam ödenecek genel toplam.\n' +
       '- dekont: odemeYonu = bizden çıkan para ise "giden", bize gelen ise "gelen"; karsiUnvan = diğer taraf (alıcı/gönderen); belgeNo = işlem/referans no; toplam = işlem tutarı; aciklama = açıklama alanı.\n' +
       '- guven: 0 ile 1 arası, belgenin okunabilirliğine göre kendi tahminin.\n' +
-      (isletme ? 'Bizim işletme: ' + isletme + '\n' : '');
+      (isletme ? 'Bizim işletme: ' + isletme + '\n' : '') + (ekstra || '');
   }
 
   function b64(buf) {
@@ -79,10 +79,10 @@
       });
   }
 
-  function geminiCagri(blob, anahtar, isletme) {
+  function geminiCagri(blob, anahtar, isletme, ekstra) {
     return blob.arrayBuffer().then(function (buf) {
       var gov = {
-        contents: [{ parts: [{ text: istem(isletme) }, { inline_data: { mime_type: blob.type || 'image/jpeg', data: b64(buf) } }] }],
+        contents: [{ parts: [{ text: istem(isletme, ekstra) }, { inline_data: { mime_type: blob.type || 'image/jpeg', data: b64(buf) } }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: SEMA, temperature: 0 }
       };
       function istek(model) {
@@ -137,7 +137,13 @@
     if (!ayar.gemini) return Promise.reject(new Error('Fotoğraf ve PDF okumak için Ayarlar\'dan Gemini anahtarı girin. E-fatura XML dosyaları anahtarsız okunur.'));
     if (dosya.size > 15 * 1024 * 1024) return Promise.reject(new Error('Dosya çok büyük (en fazla 15 MB).'));
     return kucult(dosya).then(function (b) {
+      var EK = 'DİKKAT: Önceki okumada ürün satırları boş geldi. Belgedeki tüm ürün/hizmet satırlarını tek tek kalemler dizisine yaz; yalnızca son bakiye veya toplamı döndürme.\n';
       return geminiCagri(b, ayar.gemini, ayar.unvan || '').then(function (j) {
+        if (j && j.tur !== 'diger' && !(j.kalemler && j.kalemler.length)) {
+          return geminiCagri(b, ayar.gemini, ayar.unvan || '', EK).then(function (j2) { return (j2 && j2.kalemler && j2.kalemler.length) ? j2 : j; }, function () { return j; });
+        }
+        return j;
+      }).then(function (j) {
         if (j.tur === 'diger') throw new Error('Bu belge fatura, fiş ya da dekonta benzemiyor.');
         var b = KN.geminiBelge(j);
         if (!b.toplam && b.kalemler.length) b.toplam = Math.round(b.kalemler.reduce(function (t, k) { return t + (k.tutar || k.miktar * k.birimFiyat || 0); }, 0) * 100) / 100;
