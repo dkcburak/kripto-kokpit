@@ -319,6 +319,7 @@
       h('div', { class: 'eylem' },
         h('button', { class: 'birinci', onclick: kaydet }, ik('check'), 'Onayla ve kaydet'),
         h('button', { class: 'tehlike', onclick: function () { onay('Bu belge silinsin mi?', function () { DB.sil('bekleyen', bk.id).then(function () { return DB.sil('dosyalar', bk.dosyaId); }).then(function () { git('#/ekle'); }); }, true); } }, 'Sil'))));
+    if (b.teknik) ekle(kap, h('details', { style: 'margin-top:14px;font-size:13px;opacity:.8' }, h('summary', null, 'Teknik ayrıntı (okuma ne döndürdü)'), h('pre', { style: 'white-space:pre-wrap;word-break:break-word' }, 'Model: ' + (b.teknik.model || '?') + '\n' + JSON.stringify(b.teknik.ham, null, 1))));
     cariNotYaz(); kalemleriCiz(); hesapla();
     return kap;
   }
