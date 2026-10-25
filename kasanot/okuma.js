@@ -21,6 +21,7 @@
 
   function istem(isletme) {
     return 'Bu bir Türkiye\'de düzenlenmiş muhasebe belgesi (fatura, fiş veya banka dekontu). Alanları belgede yazdığı gibi çıkar, uydurma; okunamayan alanı boş bırak.\n' +
+      '- Belge ELLE YAZILMIŞ olabilir (el yazısı fiş, adisyon, ufak defter/kağıt notu). Bu durumda el yazısını elinden geldiğince oku: rakamları ve ürün adlarını tahmin ederek yaz, belge basılı değilse tur = fis olsun, VKN/belgeNo yoksa boş bırak. Toplam yazılı değilse kalem tutarlarını toplayarak toplam ver. Hiçbir şey okuyamazsan bile toplam = 0 yerine en az görebildiğin kalemleri döndür ve guven değerini düşük ver.\n' +
       '- tur: fatura | fis | dekont.\n' +
       '- Tutarlar nokta ondalıklı sayı (1.250,50 -> 1250.5). tarih YYYY-MM-DD.\n' +
       '- fatura/fis: yon = bizim işletmeye göre "alis" (satıcı karşı taraf) veya "satis" (biz kestik). karsiUnvan/karsiVkn = karşı taraf (alışta satıcı). Fişte VKN genelde mağaza vergi no.\n' +
@@ -43,12 +44,12 @@
       if (!/^image\//.test(dosya.type)) return ok(dosya);
       var url = URL.createObjectURL(dosya), im = new Image();
       im.onload = function () {
-        var o = Math.min(1, 1800 / Math.max(im.width, im.height));
+        var o = Math.min(1, 2400 / Math.max(im.width, im.height));
         var c = document.createElement('canvas');
         c.width = Math.round(im.width * o); c.height = Math.round(im.height * o);
         c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        c.toBlob(function (b) { ok(b || dosya); }, 'image/jpeg', 0.85);
+        c.toBlob(function (b) { ok(b || dosya); }, 'image/jpeg', 0.9);
       };
       im.onerror = function () { URL.revokeObjectURL(url); ok(dosya); };
       im.src = url;
@@ -97,7 +98,9 @@
     return kucult(dosya).then(function (b) {
       return geminiCagri(b, ayar.gemini, ayar.unvan || '').then(function (j) {
         if (j.tur === 'diger') throw new Error('Bu belge fatura, fiş ya da dekonta benzemiyor.');
-        return KN.geminiBelge(j);
+        var b = KN.geminiBelge(j);
+        if (!b.toplam && b.kalemler.length) b.toplam = Math.round(b.kalemler.reduce(function (t, k) { return t + (k.tutar || k.miktar * k.birimFiyat || 0); }, 0) * 100) / 100;
+        return b;
       });
     });
   }
