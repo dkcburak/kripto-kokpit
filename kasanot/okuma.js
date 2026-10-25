@@ -1,7 +1,8 @@
 // Belge okuma: e-fatura XML yerelde; fotoğraf/PDF Gemini ile. window.OKU
 (function () {
   'use strict';
-  var MODEL = 'gemini-2.5-flash';
+  var MODEL = 'gemini-3.8-flash';
+  var SABIT = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
 
   var SEMA = {
     type: 'OBJECT',
@@ -89,26 +90,26 @@
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar }, body: JSON.stringify(gov)
         });
       }
-      var son = '';
+      var son = '', sonKod = 0;
       // Sırayla dene: önbellekteki/varsayılan model, 404 ise anahtarın gördüğü modeller (en yeni önce)
       function sirada(liste, i) {
-        if (i >= liste.length) return Promise.reject(new Error('Okuma servisi hata verdi (404). Denenen modeller: ' + son));
+        if (i >= liste.length) return Promise.reject(new Error(sonKod === 429 ? 'Günlük ücretsiz okuma sınırı doldu. Biraz sonra tekrar deneyin ya da belgeyi elle girin.' : 'Okuma servisi hata verdi (' + sonKod + '). Denenen modeller: ' + son));
         var m = liste[i];
         return istek(m).then(function (r) {
           if (r.status >= 500) return bekle(1500).then(function () { return istek(m); });
           return r;
         }).then(function (r) {
-          if (r.status === 404 || r.status >= 500) { son += (son ? ', ' : '') + m + ' (' + r.status + ')'; return sirada(liste, i + 1); }
+          if (r.status === 404 || r.status === 429 || r.status >= 500) { sonKod = r.status; son += (son ? ', ' : '') + m + ' (' + r.status + ')'; return sirada(liste, i + 1); }
           if (r.ok) yaz_(ONBELLEK, { ana: m });
           return r;
         });
       }
       var kayitli = oku_(ONBELLEK);
-      var ilk = [kayitli && kayitli.ana ? kayitli.ana : MODEL];
+      var ilk = kayitli && kayitli.ana ? [kayitli.ana].concat(SABIT) : SABIT;
       return sirada(ilk, 0).catch(function (e) {
-        if (!/404|\(5\d\d\)/.test(e.message)) throw e;
+        if (!/\(404\)|\(5\d\d\)/.test(e.message)) throw e;
         yaz_(ONBELLEK, null);
-        return modelSec(anahtar).then(function (liste) { return sirada(liste.slice(0, 5), 0); }, function () { throw e; });
+        return modelSec(anahtar).then(function (liste) { return sirada(liste.filter(function (x) { return SABIT.indexOf(x) < 0; }).slice(0, 4), 0); }, function () { throw e; });
       });
     }).then(function (r) {
       if (r.status === 429) throw new Error('Günlük ücretsiz okuma sınırı doldu. Biraz sonra tekrar deneyin ya da belgeyi elle girin.');
