@@ -71,4 +71,14 @@ t('CSV: ondalık virgül, tırnak, formül enjeksiyonu', () => {
   const c = KN.csv([['Ad', 'Tutar'], ['A;B "x"', 12.5], ['=1+1', 3]]);
   assert.ok(c.startsWith('﻿')); assert.ok(c.includes('"A;B ""x"""')); assert.ok(c.includes(';12,5')); assert.ok(c.includes("'=1+1"));
 });
+t('El yazısı sipariş fişi: miktar kg olarak düzelir, eski bakiye toplamı şişirmez', () => {
+  const b = KN.geminiBelge({ tur: 'fis', yon: 'alis', toplam: 64710, kalemler: [
+    { ad: 'Patlıcan', miktar: 2, birimFiyat: 47, tutar: 470 }, { ad: 'Salata', miktar: 1, birimFiyat: 65, tutar: 1040 },
+    { ad: 'Bamya', miktar: 1, birimFiyat: 55, tutar: 632 }, { ad: 'Sivri', miktar: 1, birimFiyat: 85, tutar: 850 },
+    { ad: 'Limon', miktar: 1, birimFiyat: 38, tutar: 380 }, { ad: 'Roka', miktar: 1, birimFiyat: 22, tutar: 110 },
+    { ad: 'Maydanoz', miktar: 1, birimFiyat: 15, tutar: 525 }] });
+  assert.deepEqual(b.kalemler.map(k => k.miktar), [10, 16, 11.49, 10, 10, 5, 35]);
+  assert.equal(b.toplam, 4007);
+  assert.ok(b.aciklama.includes('eski bakiye'));
+});
 console.log(ok + ' test geçti');

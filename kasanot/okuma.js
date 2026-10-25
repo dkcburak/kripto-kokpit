@@ -22,6 +22,7 @@
 
   function istem(isletme, ekstra) {
     return 'Bu bir Türkiye\'de düzenlenmiş muhasebe belgesi (fatura, fiş veya banka dekontu). Alanları belgede yazdığı gibi çıkar, uydurma; okunamayan alanı boş bırak.\n' +
+      '- Sipariş/irsaliye/sevk fişi türü el yazısı belgelerde ADET sütunu çuval/paket/sepet sayısıdır; asıl miktar genelde açıklamadaki "10x" gibi kg değeridir ve fiyat birim (kg) fiyatıdır. Satırı miktar x fiyat = tutar olacak şekilde yaz (örn. 10 kg x 47 = 470). Eski bakiye ve Devir önceki borçtur: kalem veya toplam DEĞİL, aciklama alanına yaz. Toplam = bu belgedeki kalemlerin toplamı; G.Toplam (genel toplam) eski bakiyeyi içerir, toplam alanına yazma. Sayın yanındaki isim alıcıdır (biz, yani alış belgesidir); satıcı unvanı belgenin başlığındaki/kaşedeki firmadır, yoksa boş bırak.\n' +
       '- Belge ELLE YAZILMIŞ olabilir (el yazısı fiş, adisyon, ufak defter/kağıt notu). Bu durumda el yazısını elinden geldiğince oku: rakamları ve ürün adlarını tahmin ederek yaz, belge basılı değilse tur = fis olsun, VKN/belgeNo yoksa boş bırak. Toplam yazılı değilse kalem tutarlarını toplayarak toplam ver. Hiçbir şey okuyamazsan bile toplam = 0 yerine en az görebildiğin kalemleri döndür ve guven değerini düşük ver.\n' +
       '- tur: fatura | fis | dekont.\n' +
       '- Tutarlar nokta ondalıklı sayı (1.250,50 -> 1250.5). tarih YYYY-MM-DD.\n' +
