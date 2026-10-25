@@ -20,6 +20,17 @@
     required: ['tur', 'toplam']
   };
 
+  var KALEM_SEMA = {
+    type: 'OBJECT',
+    properties: { kalemler: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+      ad: { type: 'STRING' }, miktar: { type: 'NUMBER' }, birim: { type: 'STRING' }, birimFiyat: { type: 'NUMBER' }, tutar: { type: 'NUMBER' } }, required: ['ad'] } } },
+    required: ['kalemler']
+  };
+  var KALEM_ISTEM = 'Görselde bir belge (fiş, sipariş fişi, irsaliye veya fatura) var; el yazısı olabilir. Sadece ürün/hizmet tablosunu oku: yukarıdan aşağı HER dolu satırı ayrı bir kalem olarak yaz. ' +
+    'Her satır için: ad (ürün adı, el yazısını tahmin ederek oku), miktar, birim (kg, adet, paket), birimFiyat (birim fiyat), tutar (satır tutarı). ' +
+    'El yazısı sipariş fişinde soldaki ADET sütunu paket/sepet sayısıdır; asıl miktar genelde açıklamadaki "10x" gibi kg değeridir, fiyat sütunu kg fiyatıdır, tutar miktar x fiyattır (örn. 10 kg x 47 = 470). ' +
+    'Toplam, Genel toplam, Eski bakiye, Devir, KDV satırları ürün değildir, bunları yazma. Okuyamadığın sayıyı 0 bırak ama satırı yine de ekle. Rakamları uydurma.';
+
   function istem(isletme, ekstra) {
     return 'Bu bir Türkiye\'de düzenlenmiş muhasebe belgesi (fatura, fiş veya banka dekontu). Alanları belgede yazdığı gibi çıkar, uydurma; okunamayan alanı boş bırak.\n' +
       '- Sipariş/irsaliye/sevk fişi türü el yazısı belgelerde ADET sütunu çuval/paket/sepet sayısıdır; asıl miktar genelde açıklamadaki "10x" gibi kg değeridir ve fiyat birim (kg) fiyatıdır. Satırı miktar x fiyat = tutar olacak şekilde yaz (örn. 10 kg x 47 = 470). Eski bakiye ve Devir önceki borçtur: kalem veya toplam DEĞİL, aciklama alanına yaz. Toplam = bu belgedeki kalemlerin toplamı; G.Toplam (genel toplam) eski bakiyeyi içerir, toplam alanına yazma. Sayın yanındaki isim alıcıdır (biz, yani alış belgesidir); satıcı unvanı belgenin başlığındaki/kaşedeki firmadır, yoksa boş bırak.\n' +
@@ -81,11 +92,11 @@
       });
   }
 
-  function geminiCagri(blob, anahtar, isletme, ekstra) {
+  function geminiCagri(blob, anahtar, isletme, ekstra, kalemModu) {
     return blob.arrayBuffer().then(function (buf) {
       var gov = {
-        contents: [{ parts: [{ text: istem(isletme, ekstra) }, { inline_data: { mime_type: blob.type || 'image/jpeg', data: b64(buf) } }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: SEMA, temperature: 0 }
+        contents: [{ parts: [{ text: kalemModu ? KALEM_ISTEM : istem(isletme, ekstra) }, { inline_data: { mime_type: blob.type || 'image/jpeg', data: b64(buf) } }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: kalemModu ? KALEM_SEMA : SEMA }
       };
       function istek(model) {
         return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
@@ -139,10 +150,13 @@
     if (!ayar.gemini) return Promise.reject(new Error('Fotoğraf ve PDF okumak için Ayarlar\'dan Gemini anahtarı girin. E-fatura XML dosyaları anahtarsız okunur.'));
     if (dosya.size > 15 * 1024 * 1024) return Promise.reject(new Error('Dosya çok büyük (en fazla 15 MB).'));
     return kucult(dosya).then(function (b) {
-      var EK = 'DİKKAT: Önceki okumada ürün satırları boş geldi. Belgedeki tüm ürün/hizmet satırlarını tek tek kalemler dizisine yaz; yalnızca son bakiye veya toplamı döndürme.\n';
       return geminiCagri(b, ayar.gemini, ayar.unvan || '').then(function (j) {
         if (j && j.tur !== 'diger' && !(j.kalemler && j.kalemler.length)) {
-          return geminiCagri(b, ayar.gemini, ayar.unvan || '', EK).then(function (j2) { return (j2 && j2.kalemler && j2.kalemler.length) ? j2 : j; }, function () { return j; });
+          // Satırlar boş geldiyse yalnızca tabloya odaklı ikinci okuma
+          return geminiCagri(b, ayar.gemini, '', '', true).then(function (jk) {
+            if (jk && jk.kalemler && jk.kalemler.length) { j.kalemler = jk.kalemler; j._kalemOkuma = true; }
+            return j;
+          }, function () { return j; });
         }
         return j;
       }).then(function (j) {
