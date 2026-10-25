@@ -57,7 +57,26 @@
   }
 
   var YEDEK_MODEL = 'gemini-2.5-flash-lite';
+  var ONBELLEK = 'kn_model';
   function bekle(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+  function surum(ad) { var m = /gemini-(\d+(?:\.\d+)?)-flash/.exec(ad); return m ? parseFloat(m[1]) : 0; }
+  function oku_(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function yaz_(k, v) { try { if (v) localStorage.setItem(k, JSON.stringify(v)); else localStorage.removeItem(k); } catch (e) {} }
+
+  // Model adı kapatılmışsa (404) anahtarın görebildiği en yeni kararlı flash modelini seç
+  function modelSec(anahtar) {
+    return fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': anahtar } })
+      .then(function (r) { if (!r.ok) throw new Error('liste ' + r.status); return r.json(); })
+      .then(function (j) {
+        var ad = (j.models || []).filter(function (m) {
+          return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0 &&
+            /^models\/gemini-[\d.]+-flash(-lite)?$/.test(m.name);
+        }).map(function (m) { return m.name.replace('models/', ''); });
+        ad.sort(function (a, b) { return (surum(b) - surum(a)) || ((/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0)); });
+        if (!ad.length) throw new Error('model yok');
+        return { ana: ad[0], yedek: ad.filter(function (x) { return /lite/.test(x); })[0] || ad[ad.length - 1] };
+      });
+  }
 
   function geminiCagri(blob, anahtar, isletme) {
     return blob.arrayBuffer().then(function (buf) {
@@ -65,15 +84,24 @@
         contents: [{ parts: [{ text: istem(isletme) }, { inline_data: { mime_type: blob.type || 'image/jpeg', data: b64(buf) } }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: SEMA, temperature: 0 }
       };
-      function dene(model, kalan) {
+      function istek(model) {
         return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar }, body: JSON.stringify(gov)
-        }).then(function (r) {
-          if (r.status >= 500 && kalan > 0) return bekle(1500).then(function () { return dene(kalan === 1 ? YEDEK_MODEL : model, kalan - 1); });
+        });
+      }
+      function dene(m, kalan, yeniden) {
+        return istek(m.ana).then(function (r) {
+          if (r.status === 404 && yeniden) {
+            yaz_(ONBELLEK, null);
+            return modelSec(anahtar).then(function (y) { yaz_(ONBELLEK, y); return dene(y, 2, false); });
+          }
+          if (r.status >= 500 && kalan > 0) {
+            return bekle(1500).then(function () { return dene({ ana: kalan === 1 ? m.yedek : m.ana, yedek: m.yedek }, kalan - 1, yeniden); });
+          }
           return r;
         });
       }
-      return dene(MODEL, 2);
+      return dene(oku_(ONBELLEK) || { ana: MODEL, yedek: YEDEK_MODEL }, 2, true);
     }).then(function (r) {
       if (r.status === 429) throw new Error('Günlük ücretsiz okuma sınırı doldu. Biraz sonra tekrar deneyin ya da belgeyi elle girin.');
       if (r.status === 400 || r.status === 403) throw new Error('Gemini anahtarı geçersiz görünüyor. Ayarlar\'dan kontrol edin.');
