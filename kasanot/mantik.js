@@ -168,6 +168,25 @@
   }
 
   // Gemini çıktısını ortak belgeye çevirir ve temizler
+  // El yazısı belgelerde miktar sütunu (paket/sepet adedi) ile kg karışabilir: miktar x fiyat tutara uymuyorsa miktar = tutar / fiyat.
+  // Genel toplam kalemlerin çok üstündeyse (eski bakiye dahil) kalem toplamı alınır.
+  function kalemDuzelt(r) {
+    var top = 0;
+    r.kalemler.forEach(function (k) {
+      if (k.birimFiyat > 0 && k.tutar > 0) {
+        if (Math.abs(k.miktar * k.birimFiyat - k.tutar) / k.tutar > 0.03) k.miktar = Math.round(k.tutar / k.birimFiyat * 100) / 100;
+      } else if (!(k.birimFiyat > 0) && k.tutar > 0 && k.miktar > 0) k.birimFiyat = Math.round(k.tutar / k.miktar * 100) / 100;
+      else if (k.birimFiyat > 0 && !(k.tutar > 0)) k.tutar = Math.round(k.miktar * k.birimFiyat * 100) / 100;
+      top += k.tutar || 0;
+    });
+    top = Math.round(top * 100) / 100;
+    if (top > 0 && r.toplam > top * 1.1) {
+      r.aciklama = (r.aciklama ? r.aciklama + ' · ' : '') + 'Belgedeki genel toplam ' + r.toplam + ' (eski bakiye dahil olabilir); bu belgenin tutarı kalem toplamı alındı.';
+      r.toplam = top;
+    }
+    return r;
+  }
+
   function geminiBelge(j) {
     j = j || {};
     var tur = ['fatura', 'fis', 'dekont'].indexOf(j.tur) >= 0 ? j.tur : 'fatura';
@@ -177,7 +196,7 @@
     var tarih = String(j.tarih || '');
     var m = tarih.match(/^(\d{2})[.\/-](\d{2})[.\/-](\d{4})$/);
     if (m) tarih = m[3] + '-' + m[2] + '-' + m[1];
-    return {
+    var r = {
       kaynak: 'yz', tur: tur, yon: yon, belgeNo: String(j.belgeNo || ''), tarih: tarih,
       karsiUnvan: String(j.karsiUnvan || ''), karsiVkn: String(j.karsiVkn || '').replace(/\D/g, ''),
       araToplam: Number(j.araToplam) || 0, kdv: Number(j.kdv) || 0, toplam: Number(j.toplam) || 0,
@@ -187,6 +206,7 @@
       }),
       aciklama: String(j.aciklama || ''), guven: Number(j.guven) || 0
     };
+    return kalemDuzelt(r);
   }
 
   // ---- Personel ----
