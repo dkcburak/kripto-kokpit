@@ -44,6 +44,8 @@
   function ayarKaydet(a) { try { localStorage.setItem(AYAR_ANAHTAR, JSON.stringify(a)); } catch (e) { bildir('Ayar kaydedilemedi (tarayıcı depolaması kapalı).'); } }
   function sayi(s) { var n = parseFloat(String(s == null ? '' : s).replace(/\./g, function (m, i, t) { return /,/.test(t) ? '' : m; }).replace(',', '.')); return isNaN(n) ? 0 : n; }
   function bugun() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  var AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  function ayAdi(ay) { var m = /^(\d{4})-(\d{2})$/.exec(ay || ''); return m ? AYLAR[+m[2] - 1] + ' ' + m[1] : ay; }
   function tarihTr(t) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t || ''); return m ? m[3] + '.' + m[2] + '.' + m[1] : (t || '—'); }
   var para = KN.para;
   var tmr;
@@ -84,11 +86,11 @@
   function git(yol) { location.hash = yol; }
 
   // ---------- yönlendirme ----------
-  var GORUNUM = { ana: ana, ekle: ekleSayfa, bekleyen: bekleyenSayfa, cariler: cariler, cari: cariDetay, urunler: urunler, urun: urunDetay, personel: personelSayfa, p: personelDetay, ayar: ayarSayfa };
+  var GORUNUM = { ana: ana, ekle: ekleSayfa, bekleyen: bekleyenSayfa, cariler: cariler, cari: cariDetay, urunler: urunler, urun: urunDetay, hareketler: hareketSayfa, personel: personelSayfa, p: personelDetay, ayar: ayarSayfa };
   function yonlendir() {
     var p = (location.hash || '#/ana').replace(/^#\//, '').split('/');
     var ad = GORUNUM[p[0]] ? p[0] : 'ana';
-    var sekme = { bekleyen: 'ekle', cari: 'cariler', urun: 'urunler', p: 'personel', ayar: '' }[ad];
+    var sekme = { hareketler: 'ana', bekleyen: 'ekle', cari: 'cariler', urun: 'urunler', p: 'personel', ayar: '' }[ad];
     sekme = sekme === undefined ? ad : sekme;
     [].forEach.call($('alt').querySelectorAll('a'), function (a) { a.classList.toggle('aktif', a.getAttribute('data-s') === sekme); });
     var kutu = $('icerik'); kutu.textContent = '';
@@ -111,6 +113,9 @@
     var uyarilar = S.fiyatlar.filter(function (f) { return f.degisim && f.tarih >= sinir; })
       .sort(function (x, y) { return y.tarih < x.tarih ? -1 : 1; }).slice(0, 6);
     var son = S.hareketler.slice().sort(function (x, y) { return y.tarih < x.tarih ? -1 : y.tarih > x.tarih ? 1 : y.id - x.id; }).slice(0, 6);
+    var oz = KN.ayOzet(S.hareketler, bugun().slice(0, 7));
+    var borclular = S.cariler.map(function (c) { return { id: c.id, unvan: c.unvan, b: cariBakiye(c.id) }; }).filter(function (c) { return c.b > 0.005; })
+      .sort(function (x, y) { return y.b - x.b; }).slice(0, 4);
     return h('div', null,
       h('div', { class: 'kahraman' },
         h('div', { class: 'et' }, 'ÖDENECEK TOPLAM'),
@@ -124,7 +129,16 @@
       bek ? h('a', { class: 'kart satir', href: '#/ekle' }, h('div', { class: 'ikon-d u' }, ik('clock')), h('div', { class: 'orta' }, h('b', null, bek + ' belge onayınızı bekliyor'), h('span', { class: 'soluk' }, 'Kontrol edip onaylayın'))) : null,
       h('div', { class: 'hizli' },
         h('a', { href: '#/ekle' }, h('span', { class: 'ik-d' }, ik('camera')), 'Belge ekle'),
-        h('a', { href: '#/cariler' }, h('span', { class: 'ik-d' }, ik('users')), 'Cariler')),
+        h('a', { href: '#/hareketler' }, h('span', { class: 'ik-d' }, ik('file')), 'Tüm hareketler')),
+      h('h2', null, 'Bu ay · ' + ayAdi(bugun().slice(0, 7))),
+      h('div', { class: 'izgara dort' },
+        [['Alış (fatura/fiş)', oz.alis, 'k'], ['Satış', oz.satis, 'i'], ['Ödediklerimiz', oz.odeme, ''], ['Tahsilatlar', oz.tahsilat, '']].map(function (x) {
+          return h('a', { class: 'kart mini', href: '#/hareketler' }, h('div', { class: 'soluk' }, x[0]), h('div', { class: 'sayi' + (x[2] ? ' ' + x[2] : '') }, para(x[1])));
+        })),
+      borclular.length ? h('h2', null, 'Ödeme bekleyenler') : null,
+      borclular.length ? h('div', { class: 'kart s0' }, borclular.map(function (c) {
+        return h('a', { class: 'satir', href: '#/cari/' + c.id }, avatar(c.unvan), h('div', { class: 'orta' }, h('b', null, c.unvan), h('span', { class: 'soluk' }, 'Ödeme/tahsilat girmek için dokunun')), h('div', { class: 'sag pozitif' }, para(c.b)));
+      })) : null,
       h('h2', null, 'Fiyat değişimi'),
       h('div', { class: 'kart s0' }, uyarilar.length ? uyarilar.map(function (f) {
         return h('a', { class: 'satir', href: '#/urun/' + encodeURIComponent(f.urun) },
@@ -167,6 +181,7 @@
         h('label', { class: 'dugme buyuk', style: 'margin:0' }, ik('upload'), 'Dosya seç (resim, PDF, e-fatura XML)',
           h('input', { type: 'file', accept: 'image/*,.pdf,application/pdf,.xml,text/xml', multiple: true, style: 'display:none', onchange: sec })),
         h('p', { class: 'soluk' }, 'Okunan bilgiler önce size gösterilir; siz onaylamadan kayıt girilmez.')),
+      h('button', { class: 'buyuk', onclick: elleGir }, ik('plus'), 'Elle gir (belge yok)'),
       !a.gemini ? h('div', { class: 'not' }, ik('alert'), 'Fotoğraf/PDF okuması için Gemini anahtarı gerekir (Ayarlar). XML dosyaları anahtarsız okunur.') : null,
       durum,
       h('h2', null, 'Onay bekleyenler'),
@@ -179,6 +194,9 @@
   }
   function bosBelge() {
     return { kaynak: 'elle', tur: 'fatura', yon: 'alis', belgeNo: '', tarih: bugun(), karsiUnvan: '', karsiVkn: '', araToplam: 0, kdv: 0, toplam: 0, para: 'TRY', kalemler: [], guven: 0 };
+  }
+  function elleGir() {
+    DB.koy('bekleyen', { dosyaId: 0, ad: 'Elle giriş', durum: 'hazir', belge: bosBelge() }).then(function (id) { git('#/bekleyen/' + id); });
   }
   function isle(dosya) {
     var a = ayar(), id;
@@ -318,7 +336,7 @@
         h('label', { style: 'display:flex;gap:8px;align-items:center' }, kopya, 'Mükerrer olsa da yine de kaydet')),
       h('div', { class: 'eylem' },
         h('button', { class: 'birinci', onclick: kaydet }, ik('check'), 'Onayla ve kaydet'),
-        h('button', { class: 'tehlike', onclick: function () { onay('Bu belge silinsin mi?', function () { DB.sil('bekleyen', bk.id).then(function () { return DB.sil('dosyalar', bk.dosyaId); }).then(function () { git('#/ekle'); }); }, true); } }, 'Sil'))));
+        h('button', { class: 'tehlike', onclick: function () { onay('Bu belge silinsin mi?', function () { DB.sil('bekleyen', bk.id).then(function () { return bk.dosyaId ? DB.sil('dosyalar', bk.dosyaId) : null; }).then(function () { git('#/ekle'); }); }, true); } }, 'Sil'))));
     if (b.teknik) ekle(kap, h('details', { style: 'margin-top:14px;font-size:13px;opacity:.8' }, h('summary', null, 'Teknik ayrıntı (okuma ne döndürdü)'), h('pre', { style: 'white-space:pre-wrap;word-break:break-word' }, 'Model: ' + (b.teknik.model || '?') + '\n' + JSON.stringify(b.teknik.ham, null, 1))));
     cariNotYaz(); kalemleriCiz(); hesapla();
     return kap;
@@ -398,36 +416,101 @@
       }) : bosKutu('wallet', 'Bu cariye ait hareket yok.')));
   }
 
+  // ---------- TÜM HAREKETLER ----------
+  var HR = { tur: '', ay: bugun().slice(0, 7) };
+  function hareketSayfa() {
+    $('baslik').textContent = 'Hareketler';
+    var ara = h('input', { type: 'search', placeholder: 'Cari veya belge no ara…', oninput: ciz }), liste = h('div', { class: 'kart s0' }), ozet = h('div', { class: 'izgara dort' }), cipler = h('div', { class: 'cipler' });
+    var ayG = h('input', { type: 'month', value: HR.ay, onchange: function () { HR.ay = this.value; ciz(); } });
+    function ciz() {
+      var q = KN.norm(ara.value), ay = HR.ay;
+      var s0 = S.hareketler.filter(function (x) { return !ay || x.tarih.slice(0, 7) === ay; });
+      ozet.textContent = '';
+      var toplam = { alis: 0, satis: 0, odeme: 0, tahsilat: 0 };
+      s0.forEach(function (x) { toplam[x.tur] += Math.abs(x.tutar); });
+      [['Alış', toplam.alis, 'k'], ['Satış', toplam.satis, 'i'], ['Ödeme', toplam.odeme, ''], ['Tahsilat', toplam.tahsilat, '']].forEach(function (x) {
+        ekle(ozet, h('div', { class: 'kart mini' }, h('div', { class: 'soluk' }, x[0]), h('div', { class: 'sayi' + (x[2] ? ' ' + x[2] : '') }, para(x[1]))));
+      });
+      cipler.textContent = '';
+      [['', 'Hepsi'], ['alis', 'Alış'], ['satis', 'Satış'], ['odeme', 'Ödeme'], ['tahsilat', 'Tahsilat']].forEach(function (c) {
+        ekle(cipler, h('button', { class: 'cip' + (HR.tur === c[0] ? ' aktif' : ''), onclick: function () { HR.tur = c[0]; ciz(); } }, c[1]));
+      });
+      var sonuc = s0.filter(function (x) { return (!HR.tur || x.tur === HR.tur) && (!q || KN.norm(cariAd(x.cariId)).indexOf(q) >= 0 || KN.norm(x.belgeNo || '').indexOf(q) >= 0); })
+        .sort(function (a, b) { return b.tarih < a.tarih ? -1 : b.tarih > a.tarih ? 1 : b.id - a.id; });
+      liste.textContent = '';
+      ekle(liste, sonuc.length ? sonuc.map(hareketSatiri) : bosKutu('wallet', 'Bu filtrede hareket yok.'));
+      csvDugme.style.display = sonuc.length ? '' : 'none';
+      csvDugme.onclick = function () { indir('hareketler-' + (HR.ay || 'tumu') + '.csv', ekstreCsv(sonuc.slice().reverse())); };
+    }
+    var csvDugme = h('button', null, ik('download'), 'Excel');
+    ciz();
+    return h('div', null, h('div', { class: 'iki' }, ayG, h('div', null, csvDugme)), h('div', { style: 'height:10px' }), ozet, h('div', { style: 'height:10px' }), cipler, ara, h('div', { style: 'height:10px' }), liste);
+  }
+
   // ---------- ÜRÜNLER ----------
+  var URUN_SIRA = 'son';
   function urunler() {
     $('baslik').textContent = 'Ürün alış fiyatları';
     var gruplar = {};
     S.fiyatlar.forEach(function (f) { (gruplar[f.urun] = gruplar[f.urun] || []).push(f); });
-    var anahtarlar = Object.keys(gruplar).sort();
-    var ara = h('input', { type: 'search', placeholder: 'Ürün ara…', oninput: ciz }), liste = h('div', { class: 'kart s0' });
+    var anahtarlar = Object.keys(gruplar);
+    var ara = h('input', { type: 'search', placeholder: 'Ürün ara…', oninput: ciz }), liste = h('div', { class: 'kart s0' }), cipler = h('div', { class: 'cipler' });
+    var sinir = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+    function sonOf(k) { return gruplar[k].slice().sort(function (a, b) { return a.tarih < b.tarih ? 1 : -1; })[0]; }
     function ciz() {
       var q = KN.norm(ara.value);
+      cipler.textContent = '';
+      [['son', 'Son alınan'], ['zam', 'Zamlananlar'], ['ad', 'A-Z']].forEach(function (c) {
+        ekle(cipler, h('button', { class: 'cip' + (URUN_SIRA === c[0] ? ' aktif' : ''), onclick: function () { URUN_SIRA = c[0]; ciz(); } }, c[1]));
+      });
       liste.textContent = '';
-      var s = anahtarlar.filter(function (k) { return !q || k.indexOf(q) >= 0; });
-      ekle(liste, s.length ? s.map(function (k) {
-        var g = gruplar[k].slice().sort(function (a, b) { return a.tarih < b.tarih ? 1 : -1; }), son = g[0];
+      var s0 = anahtarlar.filter(function (k) { return !q || k.indexOf(q) >= 0; });
+      if (URUN_SIRA === 'zam') s0 = s0.filter(function (k) { var o = sonOf(k); return o.degisim > 0 && o.tarih >= sinir; }).sort(function (a, b) { return sonOf(b).degisim - sonOf(a).degisim; });
+      else if (URUN_SIRA === 'ad') s0.sort();
+      else s0.sort(function (a, b) { var x = sonOf(a).tarih, y = sonOf(b).tarih; return x < y ? 1 : x > y ? -1 : 0; });
+      ekle(liste, s0.length ? s0.map(function (k) {
+        var g = gruplar[k], son = sonOf(k);
         return h('a', { class: 'satir', href: '#/urun/' + encodeURIComponent(k) }, avatar(son.ad),
           h('div', { class: 'orta' }, h('b', null, son.ad), h('span', { class: 'soluk' }, cariAd(son.cariId) + ' · ' + tarihTr(son.tarih) + ' · ' + g.length + ' alım')),
           h('div', { class: 'sag' }, para(son.birimFiyat), son.degisim ? h('div', { class: son.degisim > 0 ? 'pozitif' : 'negatif', style: 'font-size:13px' }, (son.degisim > 0 ? '↑ %' : '↓ %') + Math.abs(son.degisim).toLocaleString('tr-TR')) : null));
-      }) : bosKutu('tag', anahtarlar.length ? 'Eşleşen ürün yok.' : 'Alış faturası eklendikçe ürün fiyatları burada birikir.'));
+      }) : bosKutu('tag', !anahtarlar.length ? 'Alış faturası eklendikçe ürün fiyatları burada birikir.' : URUN_SIRA === 'zam' ? 'Son 30 günde zamlanan ürün yok.' : 'Eşleşen ürün yok.'));
+    }
+    function fiyatCsv() {
+      var sat = [['Ürün', 'Son fiyat', 'Son alım tarihi', 'Tedarikçi', 'En düşük', 'En yüksek', 'Ortalama', 'Alım sayısı']];
+      anahtarlar.sort().forEach(function (k) { var o = KN.urunOzet(gruplar[k]), son = sonOf(k); if (o) sat.push([son.ad, o.son, tarihTr(son.tarih), cariAd(son.cariId), o.min, o.maks, o.ort, o.adet]); });
+      indir('urun-fiyat-listesi.csv', KN.csv(sat));
     }
     ciz();
-    return h('div', null, ara, h('div', { style: 'height:10px' }), liste);
+    return h('div', null, ara, h('div', { style: 'height:10px' }), cipler, liste,
+      anahtarlar.length ? h('div', { class: 'yan' }, h('button', { onclick: fiyatCsv }, ik('download'), 'Fiyat listesi (Excel)')) : null);
+  }
+  function cizgi(g) {
+    // g: eskiden yeniye fiyat noktaları. Basit SVG çizgi grafiği.
+    var W = 300, H = 90, P = 8, fy = g.map(function (f) { return f.birimFiyat; }), lo = Math.min.apply(null, fy), hi = Math.max.apply(null, fy), ar = hi - lo || 1;
+    var nok = g.map(function (f, i) { return [P + (g.length === 1 ? (W - 2 * P) / 2 : i * (W - 2 * P) / (g.length - 1)), H - P - (f.birimFiyat - lo) / ar * (H - 2 * P)]; });
+    var v = document.createElementNS(NS, 'svg'); v.setAttribute('viewBox', '0 0 ' + W + ' ' + H); v.setAttribute('class', 'grafik'); v.setAttribute('role', 'img');
+    v.setAttribute('aria-label', 'Fiyat geçmişi grafiği: ' + g.length + ' alım, ' + para(lo) + ' ile ' + para(hi) + ' arası');
+    var yol = document.createElementNS(NS, 'path'); yol.setAttribute('d', nok.map(function (n, i) { return (i ? 'L' : 'M') + n[0].toFixed(1) + ' ' + n[1].toFixed(1); }).join(' ')); yol.setAttribute('class', 'cizgi'); v.appendChild(yol);
+    nok.forEach(function (n, i) { var c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', n[0]); c.setAttribute('cy', n[1]); c.setAttribute('r', i === nok.length - 1 ? 4.5 : 3); c.setAttribute('class', i === nok.length - 1 ? 'nokta son' : 'nokta'); v.appendChild(c); });
+    return v;
   }
   function urunDetay(key) {
     var g = S.fiyatlar.filter(function (f) { return f.urun === key; }).sort(function (a, b) { return a.tarih < b.tarih ? 1 : -1; });
     if (!g.length) return h('div', { class: 'bos' }, 'Ürün bulunamadı. ', h('a', { href: '#/urunler' }, 'Ürünler'));
     $('baslik').textContent = g[0].ad;
-    var min = Math.min.apply(null, g.map(function (f) { return f.birimFiyat; })), maks = Math.max.apply(null, g.map(function (f) { return f.birimFiyat; }));
+    var o = KN.urunOzet(g);
+    var ilkTarih = g[g.length - 1].tarih;
     return h('div', null,
       h('div', { class: 'izgara' },
-        h('div', { class: 'kart' }, h('div', { class: 'soluk' }, 'Son fiyat'), h('div', { class: 'sayi' }, para(g[0].birimFiyat))),
-        h('div', { class: 'kart' }, h('div', { class: 'soluk' }, 'En düşük / yüksek'), h('div', { class: 'sayi', style: 'font-size:17px' }, para(min) + ' / ' + para(maks)))),
+        h('div', { class: 'kart' }, h('div', { class: 'soluk' }, 'Son fiyat'), h('div', { class: 'sayi' }, para(o.son)),
+          o.adet > 1 ? h('div', { class: 'soluk ' + (o.toplamDegisim > 0 ? 'pozitif' : 'negatif') }, (o.toplamDegisim > 0 ? '↑ %' : '↓ %') + Math.abs(o.toplamDegisim).toLocaleString('tr-TR') + ' (' + tarihTr(ilkTarih) + '\'den beri)') : null),
+        h('div', { class: 'kart' }, h('div', { class: 'soluk' }, 'Ortalama'), h('div', { class: 'sayi' }, para(o.ort)), h('div', { class: 'soluk' }, para(o.min) + ' – ' + para(o.maks) + ' · ' + o.adet + ' alım'))),
+      o.adet > 1 ? h('div', { class: 'kart' }, h('div', { class: 'soluk' }, 'Fiyat geçmişi'), cizgi(g.slice().reverse())) : null,
+      o.tedarikciler.length > 1 ? h('div', { class: 'not i' }, ik('check'), h('span', null, 'En ucuz tedarikçi: ', h('b', null, cariAd(o.enUcuz.cariId)), ' (' + para(o.enUcuz.birimFiyat) + '). En pahalı ile fark %' + o.tedarikciFarki.toLocaleString('tr-TR') + '.')) : null,
+      o.tedarikciler.length > 1 ? h('h2', null, 'Tedarikçi karşılaştırma (son fiyat)') : null,
+      o.tedarikciler.length > 1 ? h('div', { class: 'kart s0' }, o.tedarikciler.map(function (f, i) {
+        return h('a', { class: 'satir', href: '#/cari/' + f.cariId }, h('div', { class: 'orta' }, h('b', null, cariAd(f.cariId)), h('span', { class: 'soluk' }, tarihTr(f.tarih))), h('div', { class: 'sag' }, para(f.birimFiyat), i === 0 ? h('div', { class: 'negatif', style: 'font-size:12px' }, 'en ucuz') : null));
+      })) : null,
       h('h2', null, 'Alış geçmişi'),
       h('div', { class: 'kart s0' }, g.map(function (f) {
         return h('a', { class: 'satir', href: '#/cari/' + f.cariId }, h('div', { class: 'orta' }, h('b', null, cariAd(f.cariId)), h('span', { class: 'soluk' }, tarihTr(f.tarih))),

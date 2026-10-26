@@ -239,6 +239,35 @@
     };
   }
 
+  // Ürün fiyat özeti. kayitlar: [{cariId, tarih, birimFiyat, degisim}] (tek ürün)
+  function urunOzet(kayitlar) {
+    var g = kayitlar.filter(function (f) { return f.birimFiyat > 0; }).sort(function (a, b) { return a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0; });
+    if (!g.length) return null;
+    var fy = g.map(function (f) { return f.birimFiyat; });
+    var son = {}; // tedarikçi başına en son fiyat
+    g.forEach(function (f) { if (!(f.cariId in son)) son[f.cariId] = f; });
+    var ted = Object.keys(son).map(function (k) { return son[k]; }).sort(function (a, b) { return a.birimFiyat - b.birimFiyat; });
+    var ilk = g[g.length - 1], sonKayit = g[0];
+    var topl = fy.reduce(function (t, x) { return t + x; }, 0);
+    return {
+      son: sonKayit.birimFiyat, min: Math.min.apply(null, fy), maks: Math.max.apply(null, fy),
+      ort: Math.round(topl / fy.length * 100) / 100, adet: g.length,
+      tedarikciler: ted, enUcuz: ted[0], tedarikciFarki: ted.length > 1 ? Math.round((ted[ted.length - 1].birimFiyat - ted[0].birimFiyat) / ted[0].birimFiyat * 1000) / 10 : 0,
+      toplamDegisim: g.length > 1 ? Math.round((sonKayit.birimFiyat - ilk.birimFiyat) / ilk.birimFiyat * 1000) / 10 : 0
+    };
+  }
+
+  // Ay özeti (ay: 'YYYY-MM'). Alış/satış fatura toplamı, ödeme ve tahsilat toplamı.
+  function ayOzet(hareketler, ay) {
+    var o = { alis: 0, satis: 0, odeme: 0, tahsilat: 0, adet: 0 };
+    hareketler.forEach(function (h) {
+      if (String(h.tarih).slice(0, 7) !== ay || !(h.tur in o)) return;
+      o[h.tur] += Math.abs(Number(h.tutar) || 0); o.adet++;
+    });
+    Object.keys(o).forEach(function (k) { if (k !== 'adet') o[k] = Math.round(o[k] * 100) / 100; });
+    return o;
+  }
+
   // CSV (Excel TR): noktalı virgül ayraç, ondalık virgül, UTF-8 BOM
   function csv(satirlar) {
     return '﻿' + satirlar.map(function (r) {
@@ -253,6 +282,6 @@
 
   var api = { csv: csv, norm: norm, benzerlik: benzerlik, cariBul: cariBul, bakiyeEtkisi: bakiyeEtkisi, bakiye: bakiye,
     urunAnahtar: urunAnahtar, fiyatDegisim: fiyatDegisim, mukerrer: mukerrer, tutarlilik: tutarlilik, para: para,
-    ublOku: ublOku, geminiBelge: geminiBelge, saatFarki: saatFarki, personelAyOzeti: personelAyOzeti };
+    ublOku: ublOku, geminiBelge: geminiBelge, saatFarki: saatFarki, personelAyOzeti: personelAyOzeti, urunOzet: urunOzet, ayOzet: ayOzet };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.KN = api;
 })(typeof self !== 'undefined' ? self : this);

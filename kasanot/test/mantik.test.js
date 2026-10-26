@@ -81,4 +81,14 @@ t('El yazısı sipariş fişi: miktar kg olarak düzelir, eski bakiye toplamı �
   assert.equal(b.toplam, 4007);
   assert.ok(b.aciklama.includes('eski bakiye'));
 });
+t('Ürün özeti: son, ortalama, en ucuz tedarikçi, toplam değişim', () => {
+  const o = KN.urunOzet([{ cariId: 1, tarih: '2026-09-01', birimFiyat: 40 }, { cariId: 2, tarih: '2026-09-15', birimFiyat: 36 }, { cariId: 1, tarih: '2026-10-10', birimFiyat: 50 }]);
+  assert.equal(o.son, 50); assert.equal(o.min, 36); assert.equal(o.maks, 50); assert.equal(o.ort, 42); assert.equal(o.adet, 3);
+  assert.equal(o.enUcuz.cariId, 2); assert.equal(o.tedarikciFarki, 38.9); assert.equal(o.toplamDegisim, 25);
+  assert.equal(KN.urunOzet([]), null);
+});
+t('Ay özeti: türlere göre toplam, başka ay dışarıda', () => {
+  const o = KN.ayOzet([{ tarih: '2026-10-03', tur: 'alis', tutar: 100 }, { tarih: '2026-10-09', tur: 'odeme', tutar: 40.5 }, { tarih: '2026-09-30', tur: 'alis', tutar: 999 }, { tarih: '2026-10-11', tur: 'satis', tutar: 20 }], '2026-10');
+  assert.deepEqual(o, { alis: 100, satis: 20, odeme: 40.5, tahsilat: 0, adet: 3 });
+});
 console.log(ok + ' test geçti');
