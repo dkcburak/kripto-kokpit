@@ -75,7 +75,7 @@ t('veto ya da B sınıfı sinyalde emir yok', function () {
   assert.strictEqual(ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: LONG }, { sinif: 'A', veto: 'ters' }), null);
   assert.strictEqual(istekler.length, 0);
 });
-t('günlük -%3: yalnız botun kendi sonucu sayılır; elle işlemin zararı botu durdurmaz', function () {
+t('günlük -%20: yalnız botun kendi sonucu sayılır; elle işlemin zararı botu durdurmaz', function () {
   props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's'; props.BOT_RISK = '1';
   var gun = new Date().toISOString().slice(0, 10);
   props.BOT_GUN = JSON.stringify({ tarih: gun, baslangic: 100, semboller: { XRP_USDT: 1 }, durdu: false });
@@ -83,12 +83,12 @@ t('günlük -%3: yalnız botun kendi sonucu sayılır; elle işlemin zararı bot
   cevap['/api/v1/private/position/list/history_positions'] = ok([{ symbol: 'XRP_USDT', realised: -1, closeTime: Date.now() }, { symbol: 'ETH_USDT', realised: -50, closeTime: Date.now() }]);
   cevap['/api/v1/contract/detail'] = ok({ contractSize: 0.1, minVol: 1 }); cevap['/api/v1/private/order/create'] = ok('5');
   ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: LONG }, { sinif: 'A' });
-  assert(istekler.some(function (x) { return /order\/create/.test(x.url); }), 'bot zararı -1, sınır -3: emir gider');
+  assert(istekler.some(function (x) { return /order\/create/.test(x.url); }), 'bot zararı -1, sınır -20: emir gider');
 });
-t('günlük -%3: botun kendi sonucu sınıra varınca yeni emir yok', function () {
+t('günlük -%20: botun kendi sonucu sınıra varınca yeni emir yok', function () {
   props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's';
   props.BOT_GUN = JSON.stringify({ tarih: new Date().toISOString().slice(0, 10), baslangic: 100, semboller: { XRP_USDT: 1 }, durdu: false }); hesap(100);
-  cevap['/api/v1/private/position/list/history_positions'] = ok([{ symbol: 'XRP_USDT', realised: -3.1, closeTime: Date.now() }]);
+  cevap['/api/v1/private/position/list/history_positions'] = ok([{ symbol: 'XRP_USDT', realised: -20.1, closeTime: Date.now() }]);
   ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: LONG }, { sinif: 'A' });
   assert(!istekler.some(function (x) { return /order\/create/.test(x.url); })); assert(/günlük zarar/.test(mesajlar[0]));
 });
@@ -173,9 +173,9 @@ t('v1.5: dünden kalan pozisyon bugün stopla kapanınca zararı günlük sını
   props.BOT_SEMBOLLER = JSON.stringify({ BTC_USDT: Date.now() - 3600000 });
   props.BOT_GUN = JSON.stringify({ tarih: bugun, baslangic: 10, semboller: {}, durdu: false });
   cevap['/api/v1/private/stoporder/list/orders'] = ok([]);
-  cevap['/api/v1/private/position/list/history_positions'] = ok({ resultList: [{ symbol: 'BTC_USDT', closeTime: Date.now() - 1000, realised: -0.5 }] });
+  cevap['/api/v1/private/position/list/history_positions'] = ok({ resultList: [{ symbol: 'BTC_USDT', closeTime: Date.now() - 1000, realised: -2.1 }] });
   ctx.botBakim();
-  var g = JSON.parse(props.BOT_GUN); assert(g.durdu, 'günlük zarar sınırı doldu (-0,5 <= -0,3)'); assert(g.semboller.BTC_USDT);
+  var g = JSON.parse(props.BOT_GUN); assert(g.durdu, 'günlük zarar sınırı doldu (-2,1 <= -2)'); assert(g.semboller.BTC_USDT);
 });
 t('anahtar yoksa emir denenmez, hata Telegram\'a yazılır', function () {
   props.BOT_MODU = 'acik';
