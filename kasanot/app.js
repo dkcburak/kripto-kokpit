@@ -106,24 +106,20 @@
   // ---------- ANA ----------
   function ana() {
     $('baslik').textContent = 'KasaNot';
-    var borc = 0, alacak = 0;
-    S.cariler.forEach(function (c) { var b = cariBakiye(c.id); if (b > 0) borc += b; else alacak -= b; });
     var bek = S.bekleyen.length, a = ayar();
     var sinir = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
     var uyarilar = S.fiyatlar.filter(function (f) { return f.degisim && f.tarih >= sinir; })
       .sort(function (x, y) { return y.tarih < x.tarih ? -1 : 1; }).slice(0, 6);
     var son = S.hareketler.slice().sort(function (x, y) { return y.tarih < x.tarih ? -1 : y.tarih > x.tarih ? 1 : y.id - x.id; }).slice(0, 6);
     var oz = KN.ayOzet(S.hareketler, bugun().slice(0, 7));
-    var borclular = S.cariler.map(function (c) { return { id: c.id, unvan: c.unvan, b: cariBakiye(c.id) }; }).filter(function (c) { return c.b > 0.005; })
-      .sort(function (x, y) { return y.b - x.b; }).slice(0, 4);
     return h('div', null,
       h('div', { class: 'kahraman' },
-        h('div', { class: 'et' }, 'ÖDENECEK TOPLAM'),
-        h('div', { class: 'buyuk-sayi' }, para(borc)),
+        h('div', { class: 'et' }, 'İŞLETME'),
+        h('div', { class: 'buyuk-sayi isim' }, a.unvan || 'KasaNot'),
         h('div', { class: 'alt-sat' },
-          h('div', null, h('b', null, para(alacak)), h('span', null, 'Alacağımız')),
           h('div', null, h('b', null, String(S.cariler.length)), h('span', null, 'Cari')),
-          h('div', null, h('b', null, String(bek)), h('span', null, 'Bekleyen')))),
+          h('div', null, h('b', null, String(bek)), h('span', null, 'Onay bekleyen')),
+          h('div', null, h('b', null, String(uyarilar.length)), h('span', null, 'Fiyat uyarısı')))),
       !BULUT.hazir() && S.hareketler.length ? h('div', { class: 'not' }, ik('alert'), h('span', null, 'Verileriniz yalnız bu cihazda duruyor. ', h('a', { href: '#/ayar' }, 'Bulut hesabı açın'), '; telefon ve bilgisayar aynı veriyi görsün, veri kaybolmasın.')) : null,
       !a.gemini ? h('div', { class: 'not b' }, ik('alert'), h('span', null, 'Fotoğraf ve PDF okumak için ', h('a', { href: '#/ayar' }, 'Ayarlar'), '\'dan ücretsiz Gemini anahtarını girin. E-fatura XML dosyaları anahtarsız okunur.')) : null,
       bek ? h('a', { class: 'kart satir', href: '#/ekle' }, h('div', { class: 'ikon-d u' }, ik('clock')), h('div', { class: 'orta' }, h('b', null, bek + ' belge onayınızı bekliyor'), h('span', { class: 'soluk' }, 'Kontrol edip onaylayın'))) : null,
@@ -135,10 +131,6 @@
         [['Alış (fatura/fiş)', oz.alis, 'k'], ['Satış', oz.satis, 'i'], ['Ödediklerimiz', oz.odeme, ''], ['Tahsilatlar', oz.tahsilat, '']].map(function (x) {
           return h('a', { class: 'kart mini', href: '#/hareketler' }, h('div', { class: 'soluk' }, x[0]), h('div', { class: 'sayi' + (x[2] ? ' ' + x[2] : '') }, para(x[1])));
         })),
-      borclular.length ? h('h2', null, 'Ödeme bekleyenler') : null,
-      borclular.length ? h('div', { class: 'kart s0' }, borclular.map(function (c) {
-        return h('a', { class: 'satir', href: '#/cari/' + c.id }, avatar(c.unvan), h('div', { class: 'orta' }, h('b', null, c.unvan), h('span', { class: 'soluk' }, 'Ödeme/tahsilat girmek için dokunun')), h('div', { class: 'sag pozitif' }, para(c.b)));
-      })) : null,
       h('h2', null, 'Fiyat değişimi'),
       h('div', { class: 'kart s0' }, uyarilar.length ? uyarilar.map(function (f) {
         return h('a', { class: 'satir', href: '#/urun/' + encodeURIComponent(f.urun) },
@@ -163,9 +155,18 @@
       var dosyalar = [].slice.call(e.target.files); e.target.value = '';
       if (!dosyalar.length) return;
       durum.textContent = '';
-      var liste = dosyalar.map(function (d) { var s = h('div', { class: 'soluk' }, 'Okunuyor: ' + d.name + '…'); durum.appendChild(s); return s; });
+      var liste = dosyalar.map(function (d) {
+        var yaz = h('span', null, 'Sırada: ' + d.name), cubuk = h('div', { class: 'cubuk' }, h('i'));
+        var s = h('div', { class: 'yukleme' }, h('div', { class: 'don' }), h('div', { class: 'orta' }, yaz, cubuk));
+        s.yaz = yaz; s.cubuk = cubuk; durum.appendChild(s); return s;
+      });
+      [].forEach.call(document.querySelectorAll('.yukle-dugme'), function (l) { l.classList.add('pasif'); });
       dosyalar.reduce(function (p, d, i) {
-        return p.then(function () { return isle(d); }).then(function (r) {
+        return p.then(function () {
+          liste[i].classList.add('aktif');
+          return isle(d, function (m, y) { liste[i].yaz.textContent = (dosyalar.length > 1 ? '(' + (i + 1) + '/' + dosyalar.length + ') ' : '') + m; liste[i].cubuk.firstChild.style.width = y + '%'; });
+        }).then(function (r) {
+          liste[i].classList.remove('aktif'); liste[i].classList.add(r.hata ? 'hata' : 'tamam');
           liste[i].textContent = (r.hata ? 'Hata: ' : 'Tamam: ') + d.name + (r.hata ? ': ' + r.hata : ' okundu');
         });
       }, Promise.resolve()).then(function () { return yukle(); }).then(function () {
@@ -176,9 +177,9 @@
     var a = ayar();
     return h('div', null,
       h('div', { class: 'kart' },
-        h('label', { class: 'dugme birinci buyuk', style: 'margin:0 0 10px' }, ik('camera'), 'Fotoğraf çek',
+        h('label', { class: 'dugme birinci buyuk yukle-dugme', style: 'margin:0 0 10px' }, ik('camera'), 'Fotoğraf çek',
           h('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none', onchange: sec })),
-        h('label', { class: 'dugme buyuk', style: 'margin:0' }, ik('upload'), 'Dosya seç (resim, PDF, e-fatura XML)',
+        h('label', { class: 'dugme buyuk yukle-dugme', style: 'margin:0' }, ik('upload'), 'Dosya seç (resim, PDF, e-fatura XML)',
           h('input', { type: 'file', accept: 'image/*,.pdf,application/pdf,.xml,text/xml', multiple: true, style: 'display:none', onchange: sec })),
         h('p', { class: 'soluk' }, 'Okunan bilgiler önce size gösterilir; siz onaylamadan kayıt girilmez.')),
       h('button', { class: 'buyuk', onclick: elleGir }, ik('plus'), 'Elle gir (belge yok)'),
@@ -198,11 +199,15 @@
   function elleGir() {
     DB.koy('bekleyen', { dosyaId: 0, ad: 'Elle giriş', durum: 'hazir', belge: bosBelge() }).then(function (id) { git('#/bekleyen/' + id); });
   }
-  function isle(dosya) {
+  function isle(dosya, say) {
     var a = ayar(), id;
+    say = say || function () {};
+    say('Yükleniyor… ' + dosya.name, 15);
     return DB.koy('dosyalar', { blob: dosya, ad: dosya.name, tip: dosya.type }).then(function (k) {
       id = k;
+      say('Yüklendi, okunuyor… ' + dosya.name + ' (birkaç saniye sürebilir)', 55);
       return OKU.oku(dosya, a).then(function (belge) {
+        say('Okundu, kaydediliyor…', 95);
         return DB.koy('bekleyen', { dosyaId: id, ad: dosya.name, durum: 'hazir', belge: belge });
       }, function (err) {
         return DB.koy('bekleyen', { dosyaId: id, ad: dosya.name, durum: 'hata', hata: String(err && err.message || err), belge: bosBelge() }).then(function () { throw err; });

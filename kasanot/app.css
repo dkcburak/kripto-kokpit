@@ -128,3 +128,17 @@ a{color:var(--ana)}
  main{max-width:980px}
  .izgara.dort{grid-template-columns:repeat(4,1fr)}
 }
+
+/* yükleme göstergesi */
+.yukleme{display:flex;align-items:center;gap:12px;background:var(--kart);border:1px solid var(--cizgi);border-radius:14px;padding:12px 14px;margin:8px 0;font-size:14px;font-weight:550}
+.yukleme .orta{flex:1;min-width:0}
+.yukleme .don{width:22px;height:22px;border-radius:50%;border:3px solid var(--cizgi);flex:none}
+.yukleme.aktif .don{border-top-color:var(--ana);animation:don .8s linear infinite}
+.yukleme.tamam{background:var(--iyi-a);color:var(--iyi)}.yukleme.tamam .don,.yukleme.hata .don{display:none}
+.yukleme.hata{background:var(--kotu-a);color:var(--kotu)}
+.cubuk{height:6px;border-radius:3px;background:var(--cizgi);margin-top:8px;overflow:hidden}
+.cubuk i{display:block;height:100%;width:0;background:var(--ana);transition:width .6s}
+.yukleme:not(.aktif) .cubuk{display:none}
+.dugme.pasif{opacity:.5;pointer-events:none}
+@keyframes don{to{transform:rotate(360deg)}}
+.kahraman .buyuk-sayi.isim{font-size:28px}
