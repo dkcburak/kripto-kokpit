@@ -162,13 +162,12 @@ function botSinyal(c, s) {
       stopLossPrice: h.stop, takeProfitPrice: h.tp1, externalOid: 'dkc' + Date.now() };
     var no = mexcIstek('post', '/api/v1/private/order/create', govde);
     var ms = botSemboller(); ms[sembol] = Date.now(); botSembolYaz(ms); botGunSembolEkle(sembol);
-    botBildir('Emir verildi: ' + ozet + ' (no ' + botEmirNo(no) + ')');
+    botBildir('Emir verildi: ' + ozet + ' (no ' + (no && no.orderId || no) + ')');
     return h;
   } catch (e) { botBildir('Hata, emir verilmedi: ' + e.message); return null; }
   finally { lock.releaseLock(); }
 }
 // Aynı "atlandı" mesajı 6 saatte bir kez gider (ör. elle açık INJ için her sinyalde tekrar yazılmasın).
-function botEmirNo(no) { return no && typeof no === 'object' ? (no.orderId != null ? no.orderId : JSON.stringify(no)) : no; }
 function botNot(mod, metin) {
   if (mod === 'kapali') return null;
   var p = botProp(), simdi = Date.now(), son = {};
@@ -277,7 +276,18 @@ function botTestEmri(yon) {
       stopLossPrice: yuvarla(stop), takeProfitPrice: yuvarla(hedef), externalOid: 'dkctest' + Date.now() };
     var no = mexcIstek('post', '/api/v1/private/order/create', govde);
     var ms = botSemboller(); ms[sembol] = Date.now(); botSembolYaz(ms); botGunSembolEkle(sembol);
-    botBildir('TEST EMRİ verildi: BTC ' + (lng ? 'LONG' : 'SHORT') + ' ' + vol + ' kontrat @ ~' + fiyat + ' · ' + kal + 'x · stop ' + govde.stopLossPrice + ' · hedef ' + govde.takeProfitPrice + ' · teminat ~' + teminat.toFixed(2) + ' USDT (no ' + botEmirNo(no) + '). Kapatmak için botKillSwitch.');
+    botBildir('TEST EMRİ verildi: BTC ' + (lng ? 'LONG' : 'SHORT') + ' ' + vol + ' kontrat @ ~' + fiyat + ' · ' + kal + 'x · stop ' + govde.stopLossPrice + ' · hedef ' + govde.takeProfitPrice + ' · teminat ~' + teminat.toFixed(2) + ' USDT (no ' + (no && no.orderId || no) + '). Kapatmak için botKillSwitch.');
+    Utilities.sleep(3000);
+    var acik = botPozisyonlar().filter(function (x) { return x.symbol === sembol; });
+    var stoplar = mexcIstek('get', '/api/v1/private/stoporder/list/orders', { is_finished: 0, page_num: 1, page_size: 50 }) || [];
+    var stopVar = stoplar.some(function (s) { return s.symbol === sembol && Number(s.stopLossPrice) > 0; });
+    if (!acik.length) botBildir('Test emri: pozisyon henüz görünmüyor (dolmamış ya da gecikmiş). MEXC\'te kontrol edin.');
+    else if (!stopVar) {
+      acik.forEach(function (x) {
+        mexcIstek('post', '/api/v1/private/order/create', { symbol: x.symbol, price: 0, vol: Number(x.holdVol), leverage: Number(x.leverage), side: Number(x.positionType) === 1 ? 4 : 2, type: 5, openType: Number(x.openType) || 1, positionId: x.positionId });
+      });
+      botBildir('⚠️ Test pozisyonunda stop görünmedi; pozisyon piyasa emriyle kapatıldı. MEXC\'te teyit edin.');
+    } else botBildir('Test emri: pozisyon açık, stop emri görünüyor.');
     return no;
   } catch (e) { botBildir('Test emri verilmedi: ' + e.message); return null; }
   finally { lock.releaseLock(); }
