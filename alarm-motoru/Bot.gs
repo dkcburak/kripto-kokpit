@@ -1,12 +1,12 @@
 /**
- * dKc Bot v1.5 (Google Apps Script, 2026-10-27) — Faz 2, bot 1: standart trend botu.
+ * dKc Bot v1.6 (Google Apps Script, 2026-10-27) — Faz 2, bot 1: standart trend botu.
  * Kod.gs ile aynı Apps Script projesine ayrı dosya olarak eklenir. Kod.gs sinyalKontrol, A/A+ sinyal bildirdiğinde botSinyal'i çağırır.
  *
  * Kurallar (Burak Bey, 20 Eki):
  * - Bakiye 100 USDT, iki bota yarı yarıya (bot 1 trend, bot 2 15 dakikalık seri işlem). Bot 2 backtest bitene kadar kapalı.
  * - Emri bot kendisi verir; her emirle birlikte stop (ve Hedef 1) gönderilir, stopsuz pozisyon kalmaz.
  * - Aynı anda tek yön (sinyal skoru pusula ve açık işlem vetosunu zaten uygular), toplam açık risk en fazla %3.
- * - Günlük zarar: yalnız botun kendi işlemlerinin sonucu (kapanan + açık), bot bakiyesinin -%3'ü; varınca bot o gün durur, botun bekleyen emirleri iptal edilir.
+ * - Günlük zarar: yalnız botun kendi işlemlerinin sonucu (kapanan + açık), bot bakiyesinin -%20'si (100 USDT'de 20 USDT; Burak Bey, 27 Eki); varınca bot o gün durur, botun bekleyen emirleri iptal edilir.
  * - Burak Bey'in elle açtığı işlem ve emirlere DOKUNMAZ: bot yalnız kendi açtığı sembolleri (BOT_SEMBOLLER) sayar, iptal eder, kapatır.
  *   Tek istisna: elle açılmış ters yönlü pozisyon varsa o yöne yeni işlem açmaz (tek yön kuralı); elle işlem olan coine girmez.
  * - Kaldıraç stopa göre 5x-10x; likidasyon stopun en az 2 katı uzakta.
@@ -24,7 +24,7 @@ var BOT = {
   pay: { trend: 0.5, seri: 0.5 },
   riskVarsayilan: 0.25, // işlem başı risk %, bot payının yüzdesi değil toplam bakiyenin yüzdesi
   riskTavan: 3,         // toplam açık risk %
-  gunlukZarar: 3,       // günlük zarar sınırı %
+  gunlukZarar: 20,      // günlük zarar sınırı % (Burak Bey, 27 Eki 2026: 100 USDT bakiyede 20 USDT)
   maxAcik: 1,           // bot 1 aynı anda en fazla 1 işlem
   emirOmruDk: 60,       // dolmayan limit emir 60 dakika sonra iptal
   kalMin: 5, kalMax: 10
