@@ -471,3 +471,15 @@ details.ayrinti>summary::after{content:"";margin-left:auto;width:8px;height:8px;
 details.ayrinti[open]>summary::after{transform:rotate(225deg)}
 details.ayrinti[open]>summary{margin-bottom:12px}
 details.ayrinti>section+section{margin-top:12px}
+
+/* Bot takip ekranı */
+.bot-ekran{display:grid;gap:12px}
+.bot-uyari{border-color:var(--short);background:color-mix(in srgb,var(--short) 10%,var(--yuzey))}
+.bot-uyari ul{margin:0;padding-left:18px}
+.bot-poz{background:var(--yuzey2);border-radius:12px;padding:10px 12px}
+.bot-olay{display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:7px 0;border-bottom:1px solid var(--cizgi);font-size:13px;align-items:baseline}
+.bot-olay:last-child{border-bottom:0}
+.bot-olay>.sayi:first-child{color:var(--sonuk);font-size:12px;white-space:nowrap}
+.d-bekle{color:var(--bekle);background:color-mix(in srgb,var(--bekle) 14%,transparent)}
+.bot-ekran .kutular{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+@media (min-width:900px){.bot-ekran{grid-template-columns:1fr 1fr}.bot-ekran>section:first-child{grid-column:1/-1}.bot-ekran .kutular{grid-template-columns:repeat(4,minmax(0,1fr))}}

@@ -195,4 +195,18 @@ t('aynı atlandı mesajı 6 saatte bir kez gider', function () {
   props.BOT_MODU = 'kuru'; ctx.botNot('kuru', 'INJ atlandı'); ctx.botNot('kuru', 'INJ atlandı'); ctx.botNot('kuru', 'BTC atlandı');
   assert.strictEqual(mesajlar.length, 2);
 });
+t('botDurum: salt okunur, anahtar sızdırmaz, stopsuz botun pozisyonu uyarı verir', function () {
+  props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'gizli-anahtar'; props.MEXC_API_SECRET = 'gizli-sir'; props.BOT_SEMBOLLER = JSON.stringify({ BTC_USDT: 1 }); props.BOT_SON_BAKIM = String(Date.now()); hesap(100.67);
+  cevap['/api/v1/private/position/open_positions'] = ok([{ symbol: 'BTC_USDT', positionType: 1, holdVol: 2, holdAvgPrice: 80000, leverage: 5, realised: 0 }]);
+  cevap['/api/v1/private/stoporder/list/orders'] = ok([]);
+  cevap['/api/v1/contract/detail'] = ok({ contractSize: 0.0001, minVol: 1 }); cevap['/api/v1/contract/ticker'] = ok({ lastPrice: 80500 });
+  cevap['/api/v1/private/position/list/history_positions'] = ok({ resultList: [{ symbol: 'ETH_USDT', positionType: 2, realised: -0.2, closeTime: 1 }] });
+  var d = ctx.botDurum();
+  assert.strictEqual(d.mod, 'acik'); assert(Math.abs(d.ozkaynak - 100.67) < 1e-9); assert.strictEqual(d.sinir, -20);
+  assert.strictEqual(d.pozisyonlar.length, 1); assert(Math.abs(d.pozisyonlar[0].pnl - 0.1) < 1e-9);
+  assert(d.uyarilar.some(function (u) { return /stopu görünmüyor/.test(u); }));
+  assert.strictEqual(d.gecmis[0].sembol, 'ETH_USDT');
+  assert(!/gizli/.test(JSON.stringify(d)), 'anahtar yanıtta olmamalı');
+  assert(!istekler.some(function (x) { return /order\/(create|cancel)/.test(x.url); }), 'emir yok');
+});
 console.log('\nSonuç: ' + n + ' geçti');

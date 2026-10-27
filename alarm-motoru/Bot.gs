@@ -1,5 +1,5 @@
 /**
- * dKc Bot v1.6 (Google Apps Script, 2026-10-27) — Faz 2, bot 1: standart trend botu.
+ * dKc Bot v1.7 (Google Apps Script, 2026-10-27) — Faz 2, bot 1: standart trend botu.
  * Kod.gs ile aynı Apps Script projesine ayrı dosya olarak eklenir. Kod.gs sinyalKontrol, A/A+ sinyal bildirdiğinde botSinyal'i çağırır.
  *
  * Kurallar (Burak Bey, 20 Eki):
@@ -190,6 +190,7 @@ function botAnahtarHatirlat() {
   botBildir(gun > 0 ? '⏰ MEXC API anahtarı ' + gun + ' gün içinde bitiyor; yenisini oluşturup Script Properties\'e girin.' : '⛔ MEXC API anahtarının süresi doldu; bot emir veremez. Yeni anahtar gerekli.');
 }
 function botBakim() {
+  try { botProp().setProperty('BOT_SON_BAKIM', String(Date.now())); } catch (e) { Logger.log(e); }
   try { botAnahtarHatirlat(); } catch (e) { Logger.log(e); }
   var mod = botModu(); if (mod !== 'acik') return;
   try {
@@ -222,6 +223,49 @@ function botBakim() {
 function botTetikKur() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'botBakim') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('botBakim').timeBased().everyMinutes(5).create();
+}
+
+// ---------- Takip ekranı için salt okunur durum (uygulamanın Bot sekmesi; emir vermez, anahtarı dışarı vermez) ----------
+// Her bölüm ayrı denenir: biri okunamazsa o bölüm 'hata' alanıyla gelir, diğerleri görünür.
+function botDurum() {
+  var o = { zaman: Date.now(), mod: botModu(), risk: botRisk(), sinirYuzde: BOT.gunlukZarar, uyarilar: [] }, p = botProp();
+  var bakim = Number(p.getProperty('BOT_SON_BAKIM')) || 0;
+  o.sonBakim = bakim;
+  if (o.mod === 'acik' && (!bakim || o.zaman - bakim > 15 * 60000)) o.uyarilar.push('Bot bakımı ' + (bakim ? Math.round((o.zaman - bakim) / 60000) + ' dakikadır' : 'hiç') + ' çalışmadı');
+  try {
+    var v = botVarlik(); o.ozkaynak = v.ozkaynak; o.kullanilabilir = v.kullanilabilir;
+    var g = botGun(v.ozkaynak); o.gunBaslangic = g.baslangic; o.sinir = -g.baslangic * BOT.gunlukZarar / 100; o.durdu = !!g.durdu;
+    try { o.bugun = g.durdu ? o.sinir : botGunSonuc(g); } catch (e) { o.bugun = null; o.bugunHata = e.message; }
+    if (o.durdu) o.uyarilar.push('Günlük zarar sınırı doldu, bugün yeni işlem yok');
+  } catch (e) { o.hesapHata = e.message; o.uyarilar.push('Hesap okunamadı: ' + e.message); }
+  try {
+    var poz = botPozisyonlar(), ms = botSemboller(), stoplar = mexcIstek('get', '/api/v1/private/stoporder/list/orders', { is_finished: 0, page_num: 1, page_size: 50 }) || [];
+    o.pozisyonlar = poz.map(function (x) {
+      var st = stoplar.filter(function (s) { return s.symbol === x.symbol; })[0] || {}, son = null, pnl = null, yon = Number(x.positionType) === 1 ? 'long' : 'short';
+      try {
+        var d = mexcAcik('/api/v1/contract/detail?symbol=' + x.symbol), t = mexcAcik('/api/v1/contract/ticker?symbol=' + x.symbol);
+        son = Number(t.lastPrice); pnl = (son - Number(x.holdAvgPrice)) * Number(x.holdVol) * Number(d.contractSize) * (yon === 'long' ? 1 : -1);
+      } catch (e) { /* fiyat okunamazsa kart yine görünür */ }
+      var stopVar = Number(st.stopLossPrice) > 0, botun = !!ms[x.symbol];
+      if (botun && !stopVar) o.uyarilar.push(x.symbol + ' pozisyonunun stopu görünmüyor');
+      return { sembol: x.symbol, yon: yon, adet: Number(x.holdVol), giris: Number(x.holdAvgPrice), kaldirac: Number(x.leverage), son: son, pnl: pnl,
+        stop: Number(st.stopLossPrice) || null, hedef: Number(st.takeProfitPrice) || null, stopVar: stopVar, botun: botun };
+    });
+    o.emirler = botEmirler().map(function (e2) { return { sembol: e2.symbol, fiyat: Number(e2.price), adet: Number(e2.vol), botun: !!ms[e2.symbol] }; });
+  } catch (e) { o.pozHata = e.message; o.uyarilar.push('Pozisyonlar okunamadı: ' + e.message); }
+  try {
+    var gecmis = mexcIstek('get', '/api/v1/private/position/list/history_positions', { page_num: 1, page_size: 20 }) || [];
+    o.gecmis = (gecmis.resultList || gecmis).slice(0, 15).map(function (x) {
+      return { sembol: x.symbol, yon: Number(x.positionType) === 1 ? 'long' : 'short', sonuc: Number(x.realised) || 0, kapanis: Number(x.closeTime) || 0 };
+    });
+  } catch (e) { o.gecmisHata = e.message; }
+  try {
+    var sh = tablo().getSheetByName('Bot'), n = sh ? sh.getLastRow() : 0;
+    o.olaylar = n ? sh.getRange(Math.max(1, n - 39), 1, Math.min(n, 40), 2).getValues().map(function (r) { return { z: String(r[0]).replace(/^'/, ''), m: String(r[1]) }; }).reverse() : [];
+  } catch (e) { o.olaylar = []; }
+  var bitis = Date.parse((p.getProperty('BOT_ANAHTAR_BITIS') || '2027-01-19') + 'T00:00:00+03:00'), kalan = Math.ceil((bitis - Date.now()) / 86400000);
+  o.anahtarGun = kalan; if (kalan <= 10) o.uyarilar.push('MEXC API anahtarı ' + kalan + ' gün içinde bitiyor');
+  return o;
 }
 
 // ---------- Elle çalıştırılır ----------
@@ -293,4 +337,4 @@ function botTestEmri(yon) {
   finally { lock.releaseLock(); }
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { BOT: BOT, botEmirHesap: botEmirHesap, mexcImza: mexcImza, botSinyal: botSinyal, botGunlukZararAsildi: botGunlukZararAsildi, botKillSwitch: botKillSwitch, botBakim: botBakim, botTestEmri: botTestEmri, botAnahtarHatirlat: botAnahtarHatirlat };
+if (typeof module !== 'undefined' && module.exports) module.exports = { BOT: BOT, botEmirHesap: botEmirHesap, mexcImza: mexcImza, botSinyal: botSinyal, botGunlukZararAsildi: botGunlukZararAsildi, botKillSwitch: botKillSwitch, botBakim: botBakim, botTestEmri: botTestEmri, botAnahtarHatirlat: botAnahtarHatirlat, botDurum: botDurum };
