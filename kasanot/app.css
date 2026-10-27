@@ -110,3 +110,35 @@ a{color:var(--ana)}
 .bulut-d{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--soluk);text-decoration:none;padding:5px 10px;border-radius:999px;background:var(--kart);border:1px solid var(--cizgi);white-space:nowrap}
 .bulut-d::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--soluk)}
 .bulut-d.tamam::before{background:var(--iyi)}.bulut-d.esitleniyor::before,.bulut-d.bekliyor::before{background:var(--vurgu)}.bulut-d.hata::before,.bulut-d.cevrimdisi::before{background:var(--kotu)}
+
+/* v2: çipler, mini kartlar, grafik */
+.izgara.dort{grid-template-columns:1fr 1fr}
+.kart.mini{padding:12px 14px;text-decoration:none;color:inherit;display:block}
+.kart.mini .sayi{font-size:19px}
+.sayi.k{color:var(--kotu)}.sayi.i{color:var(--iyi)}
+.cipler{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.cipler::-webkit-scrollbar{display:none}
+.cip{min-height:38px;padding:6px 14px;border-radius:999px;font-size:13.5px;white-space:nowrap;flex:none}
+.cip.aktif{background:var(--ana-a);color:var(--ana);border-color:var(--ana)}
+.grafik{width:100%;height:auto;display:block;margin-top:6px}
+.grafik .cizgi{fill:none;stroke:var(--ana);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.grafik .nokta{fill:var(--kart);stroke:var(--ana);stroke-width:2}
+.grafik .nokta.son{fill:var(--ana)}
+@media (min-width:760px){
+ main{max-width:980px}
+ .izgara.dort{grid-template-columns:repeat(4,1fr)}
+}
+
+/* yükleme göstergesi */
+.yukleme{display:flex;align-items:center;gap:12px;background:var(--kart);border:1px solid var(--cizgi);border-radius:14px;padding:12px 14px;margin:8px 0;font-size:14px;font-weight:550}
+.yukleme .orta{flex:1;min-width:0}
+.yukleme .don{width:22px;height:22px;border-radius:50%;border:3px solid var(--cizgi);flex:none}
+.yukleme.aktif .don{border-top-color:var(--ana);animation:don .8s linear infinite}
+.yukleme.tamam{background:var(--iyi-a);color:var(--iyi)}.yukleme.tamam .don,.yukleme.hata .don{display:none}
+.yukleme.hata{background:var(--kotu-a);color:var(--kotu)}
+.cubuk{height:6px;border-radius:3px;background:var(--cizgi);margin-top:8px;overflow:hidden}
+.cubuk i{display:block;height:100%;width:0;background:var(--ana);transition:width .6s}
+.yukleme:not(.aktif) .cubuk{display:none}
+.dugme.pasif{opacity:.5;pointer-events:none}
+@keyframes don{to{transform:rotate(360deg)}}
+.kahraman .buyuk-sayi.isim{font-size:28px}
