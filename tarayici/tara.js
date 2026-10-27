@@ -7,7 +7,7 @@ var H = require('../hesap.js');
 
 var AYAR = {
   coinSayisi: 40,          // hacme göre ilk 40 coin taranır
-  minHacim: 10e6,          // 24 saatlik işlem hacmi en az 10 milyon USDT (short yine yalnız ilk 20)
+  minHacim: 5e6,           // 24 saatlik işlem hacmi en az 5 milyon USDT (Burak Bey, 27 Eki 2026: takip listesi büyütüldü; eskiden 10 milyon) (short yine yalnız ilk 20)
   shortIlk: 20,            // short yalnızca hacimde ilk 20'deki coinlerde (analiz kuralı)
   analizListesi: 30,       // Claude analizine önerilen coin sayısı (Coinler sekmesiyle birlikte)
   bolgeAtr: 0.25,          // giriş bölgesi: 4S EMA20 ± 0,25 ATR
