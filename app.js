@@ -763,6 +763,53 @@
       '<p class="plan-not poz-not">' + esc(pozNot()) + '</p></section>' + karneHtml(durum.veri.karne) + (AYAR.api && !durum.cihaz ? eslemeBlokHtml() : '');
   }
 
+  // ---------- Bot takip ekranı (salt okunur; emir veya durdurma düğmesi yok) ----------
+  durum.bot = { veri: null, hata: '', yukleniyor: false, zaman: 0 };
+  function botYukle() {
+    if (!AYAR.api || !durum.cihaz || durum.bot.yukleniyor) return;
+    durum.bot.yukleniyor = true;
+    apiYaz({ f: 'botDurum', t: durum.cihaz }).then(function (v) { durum.bot.veri = v; durum.bot.hata = ''; durum.bot.zaman = Date.now(); },
+      function (e) { durum.bot.hata = e.message || 'Bot durumu alınamadı'; })
+      .then(function () { durum.bot.yukleniyor = false; if (/^#\/bot/.test(location.hash)) goster(); });
+  }
+  setInterval(function () { if (/^#\/bot/.test(location.hash) && !document.hidden) botYukle(); }, 60000);
+  function botSayi(x, d) { return x == null || isNaN(x) ? '–' : (x > 0 ? '+' : '') + f(x, d == null ? 2 : d); }
+  function botZaman(ms) { if (!ms) return '–'; var dk = Math.round((Date.now() - ms) / 60000); return dk < 1 ? 'az önce' : dk < 60 ? dk + ' dk önce' : dk < 1440 ? Math.round(dk / 60) + ' sa önce' : new Date(ms).toLocaleDateString('tr-TR'); }
+  function botEkran() {
+    if (!AYAR.api) return '<section class="blok"><h2>Bot</h2><p class="bos">Bot ekranı için uygulamanın sunucu adresi gerekli.</p></section>';
+    if (!durum.cihaz) return '<section class="blok esleme-blok"><h2>Bot takibi için bu cihazı eşleyin</h2>' + eslemeHtml(false) + '<p class="plan-not">Bot ekranı bakiye ve pozisyon gösterdiği için yalnızca eşli cihazlarda açılır.</p></section>';
+    var b = durum.bot, v = b.veri;
+    if (!v) { if (!b.yukleniyor && !b.hata) botYukle(); return b.hata ? '<section class="hata-ekran"><h1>Bot durumu alınamadı</h1><p>' + esc(b.hata) + '</p><button class="dugme" data-bot-yenile>Tekrar dene</button></section>' : '<div class="iskelet"></div><div class="iskelet"></div>'; }
+    var modAd = v.mod === 'acik' ? 'Gerçek mod' : v.mod === 'kuru' ? 'Kuru (emir yok)' : 'Kapalı', modSinif = v.mod === 'acik' ? 'd-long' : v.mod === 'kuru' ? 'd-bekle' : 'd-short';
+    var kul = v.sinir && v.bugun != null ? Math.max(0, Math.min(100, (-v.bugun) / (-v.sinir) * 100)) : 0;
+    var uy = (v.uyarilar || []).concat(b.hata ? ['Son yenileme başarısız: ' + b.hata] : []);
+    var h = '<div class="bot-ekran">';
+    if (uy.length) h += '<section class="blok bot-uyari" role="alert"><h2>Dikkat</h2><ul>' + uy.map(function (u) { return '<li>' + esc(u) + '</li>'; }).join('') + '</ul></section>';
+    h += '<section class="blok"><div class="blok-ust"><h2>Durum</h2><span class="durum ' + modSinif + '">' + modAd + '</span></div><div class="kutular">' +
+      '<div class="kc"><span>Bakiye</span><b>' + f(v.ozkaynak, 2) + '</b><small>USDT · boşta ' + f(v.kullanilabilir, 2) + '</small></div>' +
+      '<div class="kc' + (v.bugun != null && v.bugun < 0 ? ' kc-kirmizi' : '') + '"><span>Bugün (bot)</span><b>' + botSayi(v.bugun) + '</b><small>USDT</small></div>' +
+      '<div class="kc"><span>Günlük sınır</span><b>' + f(v.sinir, 2) + '</b><small>%' + f(v.sinirYuzde, 0) + (v.durdu ? ' · DOLDU' : '') + '</small></div>' +
+      '<div class="kc"><span>Son kontrol</span><b>' + botZaman(v.sonBakim) + '</b><small>her 5 dk</small></div></div>' +
+      '<div class="risk-cubuk' + (kul >= 100 ? ' asildi' : '') + '" role="img" aria-label="Günlük sınırın yüzde ' + Math.round(kul) + ' kullanıldı"><i style="width:' + kul + '%"></i></div>' +
+      '<p class="plan-not">İşlem başı risk %' + f(v.risk, 2) + ' · aynı anda 1 işlem · güncelleme: ' + botZaman(b.zaman) + ' <button class="dugme ikincil kucuk" data-bot-yenile' + (b.yukleniyor ? ' disabled' : '') + '>' + (b.yukleniyor ? 'Yenileniyor…' : 'Yenile') + '</button></p></section>';
+    h += '<section class="blok"><h2>Açık işlem</h2>' + ((v.pozisyonlar || []).length ? '<div class="plan-kartlar">' + v.pozisyonlar.map(function (p) {
+      var ad = p.sembol.replace('_USDT', '');
+      return '<div class="bot-poz"><div class="blok-ust"><b>' + esc(ad) + ' ' + (p.yon === 'short' ? '<span class="durum d-short">Short</span>' : '<span class="durum d-long">Long</span>') + '</b>' +
+        '<span class="sayi ' + (p.pnl >= 0 ? 'art' : 'eks') + '">' + botSayi(p.pnl) + ' USDT</span></div>' +
+        '<p class="plan-not">' + p.adet + ' kontrat · ' + p.kaldirac + 'x · giriş ' + f(p.giris) + ' · şimdi ' + f(p.son) + '</p>' +
+        '<p class="plan-not">Stop ' + (p.stopVar ? f(p.stop) + ' ✓ borsada' : '<span class="eks">görünmüyor!</span>') + ' · Hedef ' + (p.hedef ? f(p.hedef) : '–') + (p.botun ? '' : ' · elle açılmış') + '</p></div>';
+    }).join('') + '</div>' : '<p class="bos">Şu an açık işlem yok. Bot uygun sinyal bekliyor.</p>') +
+      ((v.emirler || []).length ? '<p class="plan-not">Bekleyen emir: ' + v.emirler.map(function (e) { return esc(e.sembol.replace('_USDT', '')) + ' @ ' + f(e.fiyat); }).join(', ') + '</p>' : '') + '</section>';
+    h += '<section class="blok"><h2>Son olaylar</h2><div class="liste">' + ((v.olaylar || []).length ? v.olaylar.slice(0, 25).map(function (o) {
+      return '<div class="bot-olay"><span class="sayi">' + esc(o.z.slice(5)) + '</span><span>' + esc(o.m) + '</span></div>';
+    }).join('') : '<p class="bos">Henüz kayıt yok.</p>') + '</div></section>';
+    h += '<section class="blok"><h2>Kapanan işlemler (hesap)</h2><div class="liste">' + ((v.gecmis || []).length ? v.gecmis.map(function (g) {
+      return '<div class="bot-olay"><span class="sayi">' + esc(new Date(g.kapanis).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })) + '</span><span>' + esc(g.sembol.replace('_USDT', '')) + ' ' + (g.yon === 'short' ? 'Short' : 'Long') +
+        '</span><b class="sayi ' + (g.sonuc >= 0 ? 'art' : 'eks') + '">' + botSayi(g.sonuc) + '</b></div>';
+    }).join('') : '<p class="bos">Kapanan işlem yok.</p>') + '</div><p class="plan-not">Bu ekran yalnızca okur; emir veremez ve botu durduramaz. Acil durdurma: Apps Script’te botKillSwitch ya da MEXC uygulaması.</p></section></div>';
+    return h;
+  }
+
   // ---------- Alarmlar ----------
   function alarmEkran() {
     var v = durum.veri, al = v.alarmlar, tet = v.tetiklenen;
@@ -1020,7 +1067,7 @@
   function goster() {
     tazelikGuncelle();
     var h = location.hash.replace(/^#\/?/, ''), parca = h.split('/');
-    var sekme = parca[0] === 'alarmlar' ? 'alarm' : parca[0] === 'islemler' ? 'islem' : parca[0] === 'coin' ? '' : 'ana';
+    var sekme = parca[0] === 'alarmlar' ? 'alarm' : parca[0] === 'islemler' ? 'islem' : parca[0] === 'bot' ? 'bot' : parca[0] === 'coin' ? '' : 'ana';
     document.querySelectorAll('.alt-menu a, .ust-menu a').forEach(function (a) { if (a.dataset.sekme === sekme) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (!durum.veri) {
       grafikKaldir();
@@ -1037,6 +1084,7 @@
         var c = coinBul(coin); if (c) grafikKur(c);
         document.title = coin + ' · dKc';
       } else if (parca[0] === 'alarmlar') { $('ekran').innerHTML = alarmEkran(); document.title = 'Alarmlar · dKc'; tazelikGuncelle(); }
+      else if (parca[0] === 'bot') { $('ekran').innerHTML = botEkran(); document.title = 'Bot · dKc'; }
       else if (parca[0] === 'islemler') { $('ekran').innerHTML = islemEkran(); document.title = 'İşlemlerim · dKc'; }
       else { $('ekran').innerHTML = MASA.matches ? anaEkranMasa() : anaEkran(); document.title = 'dKc'; }
     } catch (e) {
@@ -1056,6 +1104,7 @@
   }
   document.addEventListener('click', function (e) {
     var t = e.target;
+    if (t.closest('[data-bot-yenile]')) { botYukle(); goster(); return; }
     var b = t.closest('[data-filtre]'); if (b) { durum.filtre = b.dataset.filtre === durum.filtre ? 'hepsi' : b.dataset.filtre; goster(); return; }
     var tf = t.closest('[data-tf]'); if (tf) { durum.tf = tf.dataset.tf; yaz('dkc-tf', durum.tf); document.querySelectorAll('[data-tf]').forEach(function (x) { x.setAttribute('aria-pressed', x === tf); }); var c = coinBul(aktifCoin()); if (c) grafikKur(c); return; }
     var km = t.closest('[data-katman]'); if (km) { var kk = km.dataset.katman; durum.katman[kk] = !katman(kk); yaz('dkc-katman', durum.katman); goster(); return; }
