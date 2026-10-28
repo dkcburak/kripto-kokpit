@@ -209,4 +209,13 @@ t('botDurum: salt okunur, anahtar sızdırmaz, stopsuz botun pozisyonu uyarı ve
   assert(!/gizli/.test(JSON.stringify(d)), 'anahtar yanıtta olmamalı');
   assert(!istekler.some(function (x) { return /order\/(create|cancel)/.test(x.url); }), 'emir yok');
 });
+t('v1.8: gün içinde para yatırılırsa günlük sınır tabanı yükselir, düşmez', function () {
+  var gun = new Date().toISOString().slice(0, 10);
+  props.BOT_GUN = JSON.stringify({ tarih: gun, baslangic: 1.4, semboller: {}, durdu: false });
+  var g = ctx.botGun(100.67); assert.strictEqual(g.baslangic, 100);
+  assert.strictEqual(JSON.parse(props.BOT_GUN).baslangic, 100);
+  assert.strictEqual(ctx.botGun(60).baslangic, 100, 'bakiye düşünce taban düşmez');
+  assert.strictEqual(ctx.botGun(0).baslangic, 100, 'ozkaynak 0 (sembol ekleme çağrısı) tabanı bozmaz');
+  var r = ctx.botGunlukZararAsildi(100.67); assert.strictEqual(r.sinir, -20);
+});
 console.log('\nSonuç: ' + n + ' geçti');

@@ -1,5 +1,5 @@
 /**
- * dKc Bot v1.7 (Google Apps Script, 2026-10-27) — Faz 2, bot 1: standart trend botu.
+ * dKc Bot v1.8 (Google Apps Script, 2026-10-28) — Faz 2, bot 1: standart trend botu.
  * Kod.gs ile aynı Apps Script projesine ayrı dosya olarak eklenir. Kod.gs sinyalKontrol, A/A+ sinyal bildirdiğinde botSinyal'i çağırır.
  *
  * Kurallar (Burak Bey, 20 Eki):
@@ -87,6 +87,9 @@ function botGun(ozkaynak) {
   try { g = JSON.parse(p.getProperty('BOT_GUN') || '{}') || {}; } catch (e) { g = {}; }
   if (g.tarih !== bugun) { g = { tarih: bugun, baslangic: Math.min(ozkaynak, BOT.bakiye), semboller: {}, durdu: false }; p.setProperty('BOT_GUN', JSON.stringify(g)); }
   if (!g.semboller) g.semboller = {};
+  // v1.8: gün içinde para yatırılırsa (28 Eki: 1,4 USDT ile başlayan gün 100 USDT geldi, sınır -0,28 kaldı) günlük sınır tabanı yükselir; düşmez.
+  var taban = Math.min(ozkaynak, BOT.bakiye);
+  if (taban > g.baslangic) { g.baslangic = taban; botProp().setProperty('BOT_GUN', JSON.stringify(g)); }
   return g;
 }
 function botGunSembolEkle(sembol) { var g = botGun(0); g.semboller[sembol] = 1; botProp().setProperty('BOT_GUN', JSON.stringify(g)); }
@@ -337,4 +340,4 @@ function botTestEmri(yon) {
   finally { lock.releaseLock(); }
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { BOT: BOT, botEmirHesap: botEmirHesap, mexcImza: mexcImza, botSinyal: botSinyal, botGunlukZararAsildi: botGunlukZararAsildi, botKillSwitch: botKillSwitch, botBakim: botBakim, botTestEmri: botTestEmri, botAnahtarHatirlat: botAnahtarHatirlat, botDurum: botDurum };
+if (typeof module !== 'undefined' && module.exports) module.exports = { BOT: BOT, botEmirHesap: botEmirHesap, mexcImza: mexcImza, botSinyal: botSinyal, botGunlukZararAsildi: botGunlukZararAsildi, botKillSwitch: botKillSwitch, botBakim: botBakim, botTestEmri: botTestEmri, botAnahtarHatirlat: botAnahtarHatirlat, botDurum: botDurum, botGun: botGun };
