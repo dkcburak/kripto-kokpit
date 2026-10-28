@@ -17,7 +17,7 @@
 :root{
   --kagit:#f6f1e7; --kagit2:#efe8d9; --mürekkep:#0e1f1d; --soluk:#5d6b68; --cizgi:#d9d0bd;
   --ana:#0b6e66; --ana-k:#064e48; --ana-a:#dcebe6; --vurgu:#e8a317; --vurgu-a:#fbecc4;
-  --kotu:#b4232a; --iyi:#12793d;
+  --mor:#6b4fd8;--mor-k:#3f2a9e;--mor-a:#e6dffb;--kotu:#b4232a; --iyi:#12793d;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
   --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -47,7 +47,7 @@ h1,h2,h3{font-family:var(--serif);font-weight:700;letter-spacing:-.02em;line-hei
 .rozet{display:inline-flex;gap:8px;align-items:center;font-size:13px;font-weight:600;color:var(--ana-k);background:var(--ana-a);padding:6px 12px;border-radius:999px;margin-bottom:22px}
 .rozet i{width:7px;height:7px;border-radius:50%;background:var(--ana);display:block}
 .hero h1{font-size:clamp(40px,5.6vw,72px)}
-.hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--vurgu-a) 62% 92%,transparent 92%);padding:0 .08em}
+.hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--mor-a) 62% 92%,transparent 92%);padding:0 .08em}
 .hero p.alt{font-size:clamp(17px,2vw,20px);color:var(--soluk);max-width:34em;margin:22px 0 32px}
 .cta{display:flex;flex-wrap:wrap;gap:12px}
 .not{font-size:13px;color:var(--soluk);margin-top:18px}
@@ -73,21 +73,33 @@ h1,h2,h3{font-family:var(--serif);font-weight:700;letter-spacing:-.02em;line-hei
 .e2{right:-4px;bottom:110px;transform:rotate(2deg)}.e2 .d{background:var(--vurgu-a)}
 .tara{position:absolute;left:10px;right:10px;height:2px;background:linear-gradient(90deg,transparent,var(--vurgu),transparent);box-shadow:0 0 14px var(--vurgu);animation:tara 3.4s ease-in-out infinite;top:30%}
 @keyframes tara{0%,100%{top:24%;opacity:0}15%,85%{opacity:1}50%{top:44%}}
-#sahne3d{position:absolute;inset:-30px -30px;z-index:2;pointer-events:none}
-#sahne3d canvas{width:100%;height:100%;display:block}
-.sahne.v3 .telefon,.sahne.v3 .etiket{opacity:0;transition:opacity .6s}
-.sahne.v3 .telefon{visibility:hidden}
-.sahne.v3{min-height:660px}
-@media(max-width:900px){.sahne.v3{min-height:520px}}
+#cv3d{position:fixed;inset:0;width:100%;height:100%;z-index:15;pointer-events:none}
+.slot{display:none}
+.v3 .slot{display:block}
+.v3 .fb,.v3 .telefon,.v3 .etiket{display:none}
+.v3 .sahne{min-height:660px}
+@media(max-width:900px){.v3 .sahne{min-height:520px}}
+.mini{position:absolute;right:12px;top:12px;width:104px;height:104px}
+.v3 .adim .slot{height:190px;margin:-6px 0 -22px}
+.v3 .adim h3{margin-top:10px}
+.v3 .adim::before{top:8px}
+.v3 .grafik .slot{height:190px}
+.dukkan-satir{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center}
+.v3 .dukkan-satir .slot{height:300px}
+.guven-ust{display:grid;grid-template-columns:1fr 240px;gap:20px;align-items:center}
+.v3 .guven-ust .slot{height:220px}
+.v3 .son .slot{height:300px;margin:-24px 0 -6px;position:relative;z-index:1}
+.kart:has(.mini) h3,.kart:has(.mini) p{padding-right:96px}
+.kart.c2:has(.mini) .bakiye,.kart.c2:has(.mini) .cip{margin-right:0}
 /* bölümler */
 section{padding:88px 0}
 .baslik{max-width:640px;margin-bottom:48px}
-.baslik .ust-y{font-family:var(--mono);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ana);margin-bottom:14px;display:block}
+.baslik .ust-y{font-family:var(--mono);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mor);margin-bottom:14px;display:block}
 .baslik h2{font-size:clamp(30px,4.4vw,48px)}
 .baslik p{color:var(--soluk);margin-top:16px;font-size:18px}
 .adimlar{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:a}
-.adim{background:var(--kagit2);border-radius:24px;padding:28px;position:relative;counter-increment:a}
-.adim::before{content:"0" counter(a);font-family:var(--serif);font-size:56px;color:var(--cizgi);position:absolute;right:22px;top:12px;font-weight:700}
+.adim{background:var(--kagit2);border-top:4px solid var(--mor);border-radius:24px;padding:28px;position:relative;counter-increment:a}
+.adim::before{content:"0" counter(a);font-family:var(--serif);font-size:56px;color:var(--mor-a);position:absolute;right:22px;top:12px;font-weight:700}
 .adim h3{font-size:24px;margin:34px 0 10px}
 .adim p{color:var(--soluk)}
 .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
@@ -97,6 +109,7 @@ section{padding:88px 0}
 .c2{grid-column:span 2}.c3{grid-column:span 3}.c4{grid-column:span 4}
 .koyu{background:var(--ana-k);color:#eaf6f3;border-color:var(--ana-k)}
 .koyu p{color:#a9cfc9}
+.morlu{background:var(--mor-k);border-color:var(--mor-k);color:#efeaff}.morlu p{color:#c9bdf5}.morlu .cip span{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#e6dffb}
 .grafik{margin-top:18px}
 .grafik svg{width:100%;height:auto;display:block}
 .bakiye{margin-top:16px;display:grid;gap:8px;font-size:14px}
@@ -110,6 +123,7 @@ section{padding:88px 0}
 .kimler{display:flex;flex-wrap:wrap;gap:12px}
 .kimler span{font-family:var(--serif);font-size:clamp(20px,3vw,30px);padding:10px 22px;border:1.5px solid var(--mürekkep);border-radius:999px}
 .kimler span:nth-child(3n){background:var(--vurgu-a);border-color:var(--vurgu)}
+.kimler span:nth-child(4n+2){background:var(--mor-a);border-color:var(--mor)}
 .kimler span:nth-child(3n+1){background:var(--ana-a);border-color:var(--ana)}
 /* güven */
 .guven{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
@@ -138,6 +152,7 @@ footer small{display:block;margin-top:6px;max-width:44em}
   section{padding:60px 0}
   .son{padding:48px 22px;border-radius:26px}
 }
+@media(max-width:900px){.dukkan-satir,.guven-ust{grid-template-columns:1fr}.v3 .guven-ust .slot{height:180px}.v3 .dukkan-satir .slot{height:240px}.kart:has(.mini) h3,.kart:has(.mini) p{padding-right:84px}.mini{width:84px;height:84px}}
 @media(prefers-reduced-motion:reduce){.gor{opacity:1;transform:none;transition:none}.tara{animation:none;opacity:0}html{scroll-behavior:auto}}
 </style>
 </head>
@@ -159,8 +174,7 @@ footer small{display:block;margin-top:6px;max-width:44em}
     </div>
     <p class="not">Üyelik ve kurulum yok. Telefonun ana ekranına eklenir, uygulama gibi çalışır.</p>
   </div>
-  <div class="sahne" aria-hidden="true">
-    <div id="sahne3d"></div>
+  <div class="sahne" data-o="hero" aria-hidden="true">
     <div class="telefon"><div class="ekran">
       <div class="ek-ust"><img src="favicon.svg" alt="">Belgeyi onayla</div>
       <div class="ek-ic">
@@ -184,9 +198,9 @@ footer small{display:block;margin-top:6px;max-width:44em}
 <section id="nasil"><div class="w">
   <div class="baslik gor"><span class="ust-y">Nasıl çalışır</span><h2>Üç adım. Defter tutmaya gerek kalmadan.</h2><p>Siz yalnızca belgeyi çekersiniz. Okuma, eşleştirme ve hesap KasaNot'ta.</p></div>
   <div class="adimlar">
-    <div class="adim gor"><h3>Çekin</h3><p>Fiş, fatura veya dekontun fotoğrafını çekin. PDF ve e-fatura dosyası da olur.</p></div>
-    <div class="adim gor"><h3>Kontrol edin</h3><p>KasaNot okuduğunu size gösterir. Siz onaylamadan hiçbir şey kaydedilmez.</p></div>
-    <div class="adim gor"><h3>Takip edin</h3><p>Cari bakiyeniz, ürün fiyatları ve ay sonu özetiniz kendiliğinden güncellenir.</p></div>
+    <div class="adim gor"><div class="slot" data-o="kamera"></div><h3>Çekin</h3><p>Fiş, fatura veya dekontun fotoğrafını çekin. PDF ve e-fatura dosyası da olur.</p></div>
+    <div class="adim gor"><div class="slot" data-o="onay"></div><h3>Kontrol edin</h3><p>KasaNot okuduğunu size gösterir. Siz onaylamadan hiçbir şey kaydedilmez.</p></div>
+    <div class="adim gor"><div class="slot" data-o="takip"></div><h3>Takip edin</h3><p>Cari bakiyeniz, ürün fiyatları ve ay sonu özetiniz kendiliğinden güncellenir.</p></div>
   </div>
 </div></section>
 
@@ -194,25 +208,27 @@ footer small{display:block;margin-top:6px;max-width:44em}
   <div class="baslik gor"><span class="ust-y">Özellikler</span><h2>Esnafın günlük derdine göre.</h2><p>Karmaşık muhasebe ekranları yok. Her gün baktığınız şeyler var.</p></div>
   <div class="bento">
     <div class="kart c4 gor"><h3>Ürün fiyatı değişince haber verir</h3><p>Aldığınız her kalem kaydedilir. Tedarikçi fiyatı sessizce artırdığında onay ekranında ve ana sayfada görürsünüz.</p>
-      <div class="grafik"><svg viewBox="0 0 520 130" role="img" aria-label="Örnek fiyat grafiği: dana kıyma kilo fiyatı yükseliyor"><defs><linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b6e66" stop-opacity=".25"/><stop offset="1" stop-color="#0b6e66" stop-opacity="0"/></linearGradient></defs>
+      <div class="grafik"><div class="slot" data-o="cizgi"></div><div class="fb"><svg viewBox="0 0 520 130" role="img" aria-label="Örnek fiyat grafiği: dana kıyma kilo fiyatı yükseliyor"><defs><linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b6e66" stop-opacity=".25"/><stop offset="1" stop-color="#0b6e66" stop-opacity="0"/></linearGradient></defs>
       <path d="M0 100 L70 96 L140 92 L210 94 L280 80 L350 74 L420 52 L520 22 L520 130 L0 130Z" fill="url(#gr)"/>
       <path d="M0 100 L70 96 L140 92 L210 94 L280 80 L350 74 L420 52 L520 22" fill="none" stroke="#0b6e66" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="520" cy="22" r="6" fill="#e8a317"/><text x="400" y="18" font-size="13" fill="#7a4705" font-family="ui-sans-serif,sans-serif">Dana kıyma: +%8,7</text></svg></div></div>
-    <div class="kart c2 koyu gor"><h3>Cari bakiyeler</h3><p>Kime ne borcunuz, kimden ne alacağınız net.</p>
+      <circle cx="520" cy="22" r="6" fill="#e8a317"/><text x="400" y="18" font-size="13" fill="#7a4705" font-family="ui-sans-serif,sans-serif">Dana kıyma: +%8,7</text></svg></div></div></div>
+    <div class="kart c2 koyu gor"><div class="slot mini" data-o="paralar"></div><h3>Cari bakiyeler</h3><p>Kime ne borcunuz, kimden ne alacağınız net.</p>
       <div class="bakiye"><div class="ar"><span>Örnek Toptan Gıda</span><b>−14.200 ₺</b></div><div class="ar" style="background:rgba(255,255,255,.08);color:#ffb3b6"><span>Örnek Ambalaj</span><b>−3.850 ₺</b></div><div style="background:rgba(255,255,255,.08);color:#8be8b0"><span>Örnek Müşteri A.Ş.</span><b>+9.000 ₺</b></div></div></div>
-    <div class="kart c2 gor"><h3>Personel</h3><p>Giriş çıkış, mesai, avans ve ay sonu ödenecek tutar tahmini.</p><div class="cip"><span>Mesai</span><span>Avans</span><span>Ay özeti</span></div></div>
-    <div class="kart c2 gor"><h3>Excel'e aktarın</h3><p>Ekstre ve tüm hareketler tek dokunuşla tablo olarak iner. Muhasebecinize iletmek kolay.</p></div>
-    <div class="kart c2 gor"><h3>İnternetsiz de çalışır</h3><p>Depoda, bodrumda, sinyal yokken de kayıt girin. Bağlantı gelince eşitlenir.</p></div>
+    <div class="kart c2 morlu gor"><div class="slot mini" data-o="saat"></div><h3>Personel</h3><p>Giriş çıkış, mesai, avans ve ay sonu ödenecek tutar tahmini.</p><div class="cip"><span>Mesai</span><span>Avans</span><span>Ay özeti</span></div></div>
+    <div class="kart c2 gor"><div class="slot mini" data-o="tablo"></div><h3>Excel'e aktarın</h3><p>Ekstre ve tüm hareketler tek dokunuşla tablo olarak iner. Muhasebecinize iletmek kolay.</p></div>
+    <div class="kart c2 gor"><div class="slot mini" data-o="kure"></div><h3>İnternetsiz de çalışır</h3><p>Depoda, bodrumda, sinyal yokken de kayıt girin. Bağlantı gelince eşitlenir.</p></div>
   </div>
 </div></section>
 
 <section><div class="w">
+  <div class="dukkan-satir"><div>
   <div class="baslik gor"><span class="ust-y">Kimler için</span><h2>Kasası olan herkes için.</h2></div>
   <div class="kimler gor"><span>Restoran</span><span>Kafe</span><span>Market</span><span>Kasap</span><span>Fırın</span><span>Kuaför</span><span>Toptancı</span><span>Atölye</span><span>Oto servis</span><span>Ve diğer esnaflar</span></div>
+  </div><div class="slot" data-o="dukkan"></div></div>
 </div></section>
 
 <section id="guven" style="background:var(--kagit2)"><div class="w">
-  <div class="baslik gor"><span class="ust-y">Güven</span><h2>Verileriniz sizin. Kayıt ise sizin onayınızla.</h2></div>
+  <div class="guven-ust"><div class="baslik gor"><span class="ust-y">Güven</span><h2>Verileriniz sizin. Kayıt ise sizin onayınızla.</h2></div><div class="slot" data-o="kalkan"></div></div>
   <div class="guven">
     <div class="gor"><h3>Onaysız kayıt yok</h3><p>Okunan her belge önce size gösterilir. Yanlış okunursa düzeltir, sonra onaylarsınız.</p></div>
     <div class="gor"><h3>Veriniz işletmenize özel</h3><p>Kayıtlar yalnızca sizin işletmenizin üyelerince görülebilir. İsterseniz yedeğinizi dosya olarak indirirsiniz.</p></div>
@@ -221,6 +237,7 @@ footer small{display:block;margin-top:6px;max-width:44em}
 </div></section>
 
 <section><div class="w"><div class="son gor">
+  <div class="slot" data-o="telefon2"></div>
   <h2>Bugünkü faturayla başlayın.</h2>
   <p>Telefonunuzdan açın, ilk belgenizi çekin. Üyelik ve kredi kartı istemez.</p>
   <a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç →</a>
@@ -243,6 +260,6 @@ var s=document.querySelector('.sahne'),h=document.getElementById('sahne3d');
 new MutationObserver(function(m,o){if(h.classList.contains('hazir')){s.classList.add('v3');o.disconnect()}}).observe(h,{attributes:true});
 }catch(e){}})();
 </script>
-<script type="module" src="hero3d.js"></script>
+<script type="module" src="scene3d.js"></script>
 </body>
 </html>
