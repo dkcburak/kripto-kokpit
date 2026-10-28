@@ -23,14 +23,14 @@
 <div class="w">
 <nav class="nav"><a class="logo" href="#"><i><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="56"><path d="M166 132v248M176 262 330 132" stroke="#fff"/><path d="M214 300l50 50 96-124" stroke="#f5b82e"/></g></svg></i>KasaNot</a>
 <ul><li><a href="#yol">Nasıl çalışır</a></li><li><a href="#veri">Veri</a></li><li><a href="#guven">Güvenlik</a></li><li><a href="#iletisim">İletişim</a></li></ul>
-<a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç</a></nav>
+<a class="btn" href="#" data-guncel>Uygulamayı aç</a></nav>
 
 <header class="hero">
  <div>
   <span class="mono">Esnaf için akıllı kayıt</span>
   <h1 style="margin-top:18px">Faturayı çekin. <span>Gerisi kendiliğinden</span> kayıt olsun.</h1>
   <p>KasaNot belgeyi okur, cariye işler ve ürün fiyatı değişince sizi uyarır. Her kayıt sizin onayınızla girer.</p>
-  <div class="cta"><a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç →</a><a class="btn g" href="#yol">Nasıl çalışıyor?</a></div>
+  <div class="cta"><a class="btn" href="#" data-guncel>Uygulamayı aç →</a><a class="btn g" href="#yol">Nasıl çalışıyor?</a></div>
   <div class="canli"><div><b>1 dokunuş</b><small>Excel çıktısı</small></div><div><b>0</b><small>onaysız kayıt</small></div><div><b>Çevrimdışı</b><small>çalışmaya devam eder</small></div></div>
  </div>
  <div class="sahne" aria-hidden="true">
@@ -89,7 +89,7 @@
  </div>
 </section>
 
-<div class="son" id="iletisim"><h2>Bugünkü faturayla başlayın.</h2><div class="cta"><a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç →</a><a class="btn g" href="#iletisim">info@kasanot.com.tr</a></div></div>
+<div class="son" id="iletisim"><h2>Bugünkü faturayla başlayın.</h2><div class="cta"><a class="btn" href="#" data-guncel>Uygulamayı aç →</a><a class="btn g" href="#iletisim">info@kasanot.com.tr</a></div></div>
 <footer><span>© 2026 KasaNot · Yardımcı kayıt aracıdır; resmî muhasebe ve e-defter yerine geçmez.</span><span>Ekranlardaki ve grafiklerdeki tüm veriler örnektir.</span></footer>
 </div>
 <script>
@@ -107,5 +107,7 @@ if('IntersectionObserver' in window){
 })();
 </script>
 
+<div id="gt" role="status" aria-live="polite" style="position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:#0d2230;color:#e8f3f6;border:1px solid #3ee0cb;padding:14px 22px;border-radius:12px;font:500 15px Hanken Grotesk,sans-serif;opacity:0;pointer-events:none;transition:.3s;z-index:99;text-align:center">Uygulama güncelleniyor. Çok yakında burada olacak.</div>
+<script>(function(){var t=document.getElementById("gt"),h;document.querySelectorAll("[data-guncel]").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();t.style.opacity=1;t.style.transform="translate(-50%,0)";clearTimeout(h);h=setTimeout(function(){t.style.opacity=0;t.style.transform="translate(-50%,20px)"},3500)})})})();</script>
 </body>
 </html>
