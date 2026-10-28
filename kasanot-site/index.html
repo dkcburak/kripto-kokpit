@@ -3,154 +3,109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a1b2b">
+<meta name="theme-color" content="#06121a">
 <title>KasaNot | Fatura, cari ve fiyat takibi</title>
-<meta name="description" content="KasaNot; fatura, fiş ve dekontları okuyup cari hesaplara, ürün fiyatlarına ve personel kayıtlarına işler. Her kayıt sizin onayınızla girer.">
-<meta property="og:title" content="KasaNot | Belgeden kayda, kayıttan rapora tek akış">
-<meta property="og:description" content="Fatura, cari hesap, ürün fiyat izleme ve personel takibi tek platformda.">
+<meta name="description" content="Faturayı çekin, KasaNot okusun. Cari bakiyeler, ürün fiyat uyarıları ve personel kaydı tek uygulamada. Her kayıt sizin onayınızla girer.">
+<meta property="og:title" content="KasaNot | Faturayı çekin, gerisi kendiliğinden kayıt olsun">
+<meta property="og:description" content="Esnaf için fatura, cari ve fiyat takibi. Telefonunuzda çalışır.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://kasanot.com.tr/">
 <meta property="og:image" content="https://kasanot.com.tr/ikon-512.png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="ikon-180.png">
-<link rel="preload" href="yazi/inter-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="yazi/sora-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="yazi.css">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
-<header class="nav"><div class="w">
-  <a class="logo" href="./"><img src="favicon.svg" alt="" width="30" height="30">KasaNot</a>
-  <ul><li><a href="#platform">Platform</a></li><li><a href="#surec">Süreç</a></li><li><a href="#guvenlik">Güvenlik</a></li><li><a href="#iletisim">İletişim</a></li></ul>
-  <div class="sag"><a class="btn s" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç</a></div>
-</div></header>
 
-<main>
-<div class="hero"><div class="w">
-  <div>
-    <h1>Belgeden kayda, kayıttan rapora. Tek akış.</h1>
-    <p class="lead">KasaNot fatura, fiş ve dekontları okuyup cari hesaplara, ürün fiyatlarına ve personel kayıtlarına işler. Her kayıt sizin onayınızla girer.</p>
-    <div class="cta"><a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç</a><a class="btn o" href="#platform">Platformu inceleyin</a></div>
-    <div class="spec tag"><span><i></i>Fatura</span><span><i></i>Fiş</span><span><i></i>Dekont</span><span><i></i>E-fatura XML (UBL-TR)</span></div>
+
+<div class="w">
+<nav class="nav"><a class="logo" href="#"><i><svg viewBox="0 0 512 512" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="56"><path d="M166 132v248M176 262 330 132" stroke="#fff"/><path d="M214 300l50 50 96-124" stroke="#f5b82e"/></g></svg></i>KasaNot</a>
+<ul><li><a href="#yol">Nasıl çalışır</a></li><li><a href="#veri">Veri</a></li><li><a href="#guven">Güvenlik</a></li><li><a href="#iletisim">İletişim</a></li></ul>
+<a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç</a></nav>
+
+<header class="hero">
+ <div>
+  <span class="mono">Esnaf için akıllı kayıt</span>
+  <h1 style="margin-top:18px">Faturayı çekin. <span>Gerisi kendiliğinden</span> kayıt olsun.</h1>
+  <p>KasaNot belgeyi okur, cariye işler ve ürün fiyatı değişince sizi uyarır. Her kayıt sizin onayınızla girer.</p>
+  <div class="cta"><a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç →</a><a class="btn g" href="#yol">Nasıl çalışıyor?</a></div>
+  <div class="canli"><div><b>1 dokunuş</b><small>Excel çıktısı</small></div><div><b>0</b><small>onaysız kayıt</small></div><div><b>Çevrimdışı</b><small>çalışmaya devam eder</small></div></div>
+ </div>
+ <div class="sahne" aria-hidden="true">
+  <div class="tel" id="hp"><img src="img/ana.webp" alt=""><span class="cam"></span></div>
+  <div class="gc g1"><span class="mono">Okundu</span><b>Fatura ÖRN-0452</b><small>23.850,00 ₺ · 3 kalem</small></div>
+  <div class="gc g2"><span class="mono up">Fiyat uyarısı</span><b>Dana kıyma</b><small class="up">520 → 565 ₺/kg · +%8,7</small></div>
+  <div class="gc g3"><span class="mono ok">Cari bakiye</span><b>49.100,00 ₺</b><small>Örnek Et</small></div>
+ </div>
+</header>
+<div class="ribbon" aria-hidden="true"><div><span>Fatura</span><span>Fiş</span><span>Dekont</span><span>E-fatura XML</span><span>Cari hesap</span><span>Ürün fiyatı</span><span>Personel</span><span>Excel çıktısı</span><span>Fatura</span><span>Fiş</span><span>Dekont</span><span>E-fatura XML</span><span>Cari hesap</span><span>Ürün fiyatı</span><span>Personel</span><span>Excel çıktısı</span></div></div>
+
+<section id="yol">
+ <div class="baslik"><span class="mono">Bir belgenin yolculuğu</span><h2>Çekilen fotoğraftan kayda, dört adım.</h2></div>
+ <div class="yol">
+  <div class="adimlar">
+   <div class="as on" data-i="0"><span class="mono">Adım 1</span><h3>Belgeyi ekleyin</h3><p>Fiş, fatura veya dekontun fotoğrafını çekin. PDF ve e-fatura dosyası da olur.</p><div class="mp"><div class="tel"><img src="img/ana.webp" alt="KasaNot ana ekranı" loading="lazy"></div></div></div>
+   <div class="as" data-i="1"><span class="mono">Adım 2</span><h3>Okunanı kontrol edin</h3><p>Cari, tarih, kalem ve tutar önünüzde. Yanlış varsa düzeltir, doğruysa onaylarsınız.</p><div class="mp"><div class="tel"><img src="img/onay.webp" alt="Belge onay ekranı" loading="lazy"></div></div></div>
+   <div class="as" data-i="2"><span class="mono">Adım 3</span><h3>Cari bakiye güncellenir</h3><p>Kime ne borcunuz olduğu ve kimden alacağınız anında görünür.</p><div class="mp"><div class="tel"><img src="img/cariler.webp" alt="Cari listesi ve bakiyeler" loading="lazy"></div></div></div>
+   <div class="as" data-i="3"><span class="mono">Adım 4</span><h3>Zam gelince haberiniz olur</h3><p>Ürünün önceki alış fiyatıyla farkı işaretlenir, yükselenler öne çıkar.</p><div class="mp"><div class="tel"><img src="img/urunler.webp" alt="Ürün alış fiyatları ve fiyat değişimleri" loading="lazy"></div></div></div>
   </div>
+  <div class="stick"><div class="halo"></div><div class="tel"><img class="on" src="img/ana.webp" alt="KasaNot ana ekranı: bu ayın alış, ödeme ve fiyat değişimi özeti"><img src="img/onay.webp" alt="Belge onay ekranı: okunan cari, tarih ve kalemler" loading="lazy"><img src="img/cariler.webp" alt="Cari listesi ve bakiyeler" loading="lazy"><img src="img/urunler.webp" alt="Ürün alış fiyatları ve fiyat değişimleri" loading="lazy"></div></div>
+ </div>
+</section>
 
-  <div class="kompo" id="kompo" aria-hidden="true">
-    <svg class="bag" id="bag"></svg>
-    <div class="belge">
-      <h4>FATURA</h4>
-      <div class="ust"><span class="hl" data-k="CARİ">Örnek Toptan Gıda Ltd.</span><span class="hl" data-k="TARİH">27.10.2026</span></div>
-      <div class="ust"><span>Fatura no: ÖRN-2026-0412</span><span></span></div>
-      <div class="sat"><span>Dana kıyma · 24 kg</span><span class="num">13.560,00</span></div>
-      <div class="sat"><span>Ayçiçek yağı · 6 bidon</span><span class="num">4.320,00</span></div>
-      <div class="sat"><span>Un 25 kg · 10 çuval</span><span class="num">5.900,00</span></div>
-      <div class="sat"><span>Genel toplam</span><span class="num hl" data-k="TUTAR"><b>23.780,00</b></span></div>
-    </div>
-    <div class="kayit">
-      <div class="ba"><span class="tag">Kayıt taslağı</span><span class="durum"><i></i>Onay bekliyor</span></div>
-      <div class="gv">
-        <div class="f fk" data-k="CARİ"><span class="tag">Cari</span><b>Örnek Toptan Gıda Ltd.</b></div>
-        <div class="f fk" data-k="TARİH"><span class="tag">Tarih</span><b>2026-10-27</b></div>
-        <div class="f"><span class="tag">Belge türü</span><b>Alış faturası</b></div>
-        <div class="f"><span class="tag">Kalem</span><b>3</b></div>
-        <div class="f fk" data-k="TUTAR"><span class="tag">Tutar</span><b>23.780,00 TRY</b></div>
-      </div>
-      <div class="uyari"><b>!</b><span>Dana kıyma: 520,00 → 565,00 ₺/kg</span><b>+8,7%</b></div>
-      <div class="ak"><span class="b">Düzelt</span><span class="a">Onayla ve kaydet</span></div>
-    </div>
-  </div>
-</div></div>
+<section id="veri">
+ <div class="baslik"><span class="mono">Veri</span><h2>Rakamlar tablo olarak değil, bakışta okunur.</h2><p>Fiyat hareketi, borç dağılımı ve çalışma saatleri görsel olarak önünüzde.</p></div>
+ <div class="bento">
+  <div class="k c7"><h3>Fiyat izleme</h3><p>Dana kıyma, son 6 alışta nasıl hareket etti.</p>
+   <div class="grafik"><svg viewBox="0 0 560 190" role="img" aria-label="Dana kıyma fiyat grafiği"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ee0cb" stop-opacity=".35"/><stop offset="1" stop-color="#3ee0cb" stop-opacity="0"/></linearGradient></defs>
+    <g stroke="#18394b" stroke-width="1"><line x1="0" y1="40" x2="560" y2="40"/><line x1="0" y1="90" x2="560" y2="90"/><line x1="0" y1="140" x2="560" y2="140"/></g>
+    <path class="alan" d="M0 150 L100 142 L200 138 L300 128 L400 100 L560 30 L560 190 L0 190Z" fill="url(#ag)"/>
+    <path class="cizgi" d="M0 150 L100 142 L200 138 L300 128 L400 100 L560 30" fill="none" stroke="#3ee0cb" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="560" cy="30" r="7" fill="#f5b83a"/><circle cx="560" cy="30" r="14" fill="none" stroke="#f5b83a" stroke-opacity=".4"/>
+    <text x="548" y="18" text-anchor="end" fill="#f5b83a" font-family="IBM Plex Mono,monospace" font-size="13">565 ₺/kg · +%8,7</text></svg></div>
+   <div class="chips"><span class="u">Dana kıyma +%8,7</span><span class="u">Domates +%13,9</span><span class="d">Un 25 kg −%2,5</span></div></div>
+  <div class="k c5"><h3>Borç dağılımı</h3><p>Hangi tedarikçiye ne kadar borcunuz var.</p>
+   <div class="donut"><svg viewBox="0 0 42 42" role="img" aria-label="Borç dağılımı"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#18394b" stroke-width="6"/>
+    <circle cx="21" cy="21" r="15.9" fill="none" stroke="#3ee0cb" stroke-width="6" stroke-dasharray="52 48" stroke-dashoffset="25"/>
+    <circle cx="21" cy="21" r="15.9" fill="none" stroke="#f5b83a" stroke-width="6" stroke-dasharray="21 79" stroke-dashoffset="-27"/>
+    <circle cx="21" cy="21" r="15.9" fill="none" stroke="#8ea9b6" stroke-width="6" stroke-dasharray="13 87" stroke-dashoffset="-48"/>
+    <circle cx="21" cy="21" r="15.9" fill="none" stroke="#6b7fff" stroke-width="6" stroke-dasharray="14 86" stroke-dashoffset="-61"/></svg>
+    <div class="lej"><div><i style="background:#3ee0cb"></i>Örnek Et<b>%52</b></div><div><i style="background:#f5b83a"></i>Örnek Gıda<b>%21</b></div><div><i style="background:#8ea9b6"></i>Örnek Manav<b>%13</b></div><div><i style="background:#6b7fff"></i>Diğer<b>%14</b></div></div></div></div>
+  <div class="k c5"><h3>Personel</h3><p>Aylık çalışma ve ödenecek tutar tahmini.</p>
+   <div class="halkalar"><div><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="16" fill="none" stroke="#18394b" stroke-width="4"/><circle cx="21" cy="21" r="16" fill="none" stroke="#3ee0cb" stroke-width="4" stroke-linecap="round" stroke-dasharray="78 100" transform="rotate(-90 21 21)"/></svg><b>15 gün</b>Ahmet Y.</div><div><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="16" fill="none" stroke="#18394b" stroke-width="4"/><circle cx="21" cy="21" r="16" fill="none" stroke="#f5b83a" stroke-width="4" stroke-linecap="round" stroke-dasharray="70 100" transform="rotate(-90 21 21)"/></svg><b>15 gün</b>Zeynep K.</div><div><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="16" fill="none" stroke="#18394b" stroke-width="4"/><circle cx="21" cy="21" r="16" fill="none" stroke="#6b7fff" stroke-width="4" stroke-linecap="round" stroke-dasharray="84 100" transform="rotate(-90 21 21)"/></svg><b>15 gün</b>Mehmet D.</div></div></div>
+  <div class="k c7"><h3>Ay sonu, tek dokunuşla Excel'de.</h3><p>Ekstre ve tüm hareketler tablo olarak iner. Muhasebecinize iletmek için hazır.</p>
+   <div class="chips"><span>CSV / Excel</span><span>Cari ekstresi</span><span>Tüm hareketler</span><span>Yedek dosyası</span></div></div>
+ </div>
+</section>
 
-<section id="platform"><div class="w">
-  <div class="bas gor"><div class="tag">Platform</div><h2>Günlük finansal işleyişin tamamı tek yerde.</h2><p>Belge alımından cari bakiyeye, ürün fiyatından personel kaydına kadar her adım aynı kayıt düzeninde tutulur.</p></div>
-  <div class="pano">
-    <div class="kt c7 gor"><div class="ic"><h3>Cari hesaplar</h3><p>Her tedarikçi ve müşteri için borç, alacak ve güncel bakiye. Ekstre tek dokunuşla Excel'e iner.</p></div>
-      <div class="ek"><table class="tb num"><thead><tr><th>Tarih</th><th>Belge</th><th class="r">Borç</th><th class="r">Alacak</th><th class="r">Bakiye</th></tr></thead><tbody>
-        <tr><td>27.10</td><td>Alış faturası ÖRN-0412</td><td class="r">23.780,00</td><td class="r">–</td><td class="r">23.780,00</td></tr>
-        <tr><td>28.10</td><td>Ödeme (dekont)</td><td class="r">–</td><td class="r">10.000,00</td><td class="r">13.780,00</td></tr>
-        <tr><td>02.11</td><td>Alış faturası ÖRN-0431</td><td class="r">6.420,00</td><td class="r">–</td><td class="r">20.200,00</td></tr></tbody>
-        <tfoot><tr><td colspan="4">Güncel bakiye (borcumuz)</td><td class="r">20.200,00</td></tr></tfoot></table></div></div>
-    <div class="kt c5 gor"><div class="ic"><h3>Ürün fiyat izleme</h3><p>Alış kalemleri kaydedilir. Önceki alıma göre değişim onay ekranında ve ana sayfada işaretlenir.</p></div>
-      <div class="ek"><table class="tb num"><thead><tr><th>Ürün</th><th class="r">Son alış</th><th class="r">Değişim</th></tr></thead><tbody>
-        <tr><td>Dana kıyma</td><td class="r">565,00</td><td class="r amb">+8,7% <svg class="spk" viewBox="0 0 64 20"><polyline points="0,15 12,14 24,13 36,12 48,8 64,2" fill="none" stroke="#b7791f" stroke-width="1.6"/></svg></td></tr>
-        <tr><td>Ayçiçek yağı</td><td class="r">720,00</td><td class="r">0,0% <svg class="spk" viewBox="0 0 64 20"><polyline points="0,10 64,10" fill="none" stroke="#7a8999" stroke-width="1.6"/></svg></td></tr>
-        <tr><td>Un 25 kg</td><td class="r">575,00</td><td class="r pos">−2,5% <svg class="spk" viewBox="0 0 64 20"><polyline points="0,4 16,5 32,8 48,12 64,14" fill="none" stroke="#12793d" stroke-width="1.6"/></svg></td></tr></tbody></table></div></div>
-    <div class="kt c5 gor"><div class="ic"><h3>Personel ve mesai</h3><p>Giriş çıkış, fazla mesai, avans ve ay sonu ödenecek tutar tahmini.</p></div>
-      <div class="ek"><div class="hafta"><span></span><span class="g">PZT</span><span class="g">SAL</span><span class="g">ÇAR</span><span class="g">PER</span><span class="g">CUM</span><span class="g">CMT</span><span class="g">PAZ</span>
-        <span class="ad">Ahmet Y.</span><i class="b"></i><i class="b"></i><i class="b x"></i><i class="b"></i><i class="b"></i><i class="b"></i><i class="bo"></i>
-        <span class="ad">Zeynep K.</span><i class="b"></i><i class="b"></i><i class="b"></i><i class="bo"></i><i class="b"></i><i class="b x"></i><i class="b"></i></div></div></div>
-    <div class="kt c7 gor"><div class="ic"><h3>Raporlama ve dışa aktarım</h3><p>Ekstre ve tüm hareketler tablo olarak indirilir. Mali müşavirinize iletmek için hazır.</p></div>
-      <div class="ek"><div class="rapor"><div class="st"><span class="tag">Aylık alış toplamı</span><span class="tag" style="color:var(--teal)">CSV / Excel</span></div>
-        <div class="cubuk"><i style="height:46%"></i><i style="height:58%"></i><i style="height:52%"></i><i style="height:70%"></i><i style="height:64%"></i><i class="a" style="height:92%"></i></div>
-        <div class="ay"><span>MAY</span><span>HAZ</span><span>TEM</span><span>AĞU</span><span>EYL</span><span>EKİ</span></div></div></div></div>
-  </div>
-</div></section>
+<section id="guven">
+ <div class="baslik"><span class="mono">Güvenlik ve kontrol</span><h2>Siz onaylamadan hiçbir kayıt girmez.</h2></div>
+ <div class="guv">
+  <div class="k"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/><rect x="2.5" y="2.5" width="19" height="19" rx="5"/></svg><h3>Onay zorunlu</h3><p>Okunan her belge önce size gösterilir.</p></div>
+  <div class="k"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6z"/></svg><h3>İşletmeye özel erişim</h3><p>Kayıtlar yalnızca işletmenizin üyelerince okunur ve yazılır.</p></div>
+  <div class="k"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0 4-4m-4 4-4-4M4 20h16"/></svg><h3>Yedek sizde</h3><p>Tüm veriyi dosya olarak indirin. Bağlantı yokken de kayıt girin.</p></div>
+ </div>
+</section>
 
-<section id="surec" class="koyu"><div class="w">
-  <div class="bas gor"><div class="tag">Süreç</div><h2>Her belge aynı beş adımdan geçer.</h2><p>Okuma otomatiktir. Kayda geçiş ise yalnızca sizin onayınızla olur.</p></div>
-  <div class="akis gor">
-    <div class="ad"><div class="n">01</div><h3>Belge alımı</h3><p>Fotoğraf, PDF veya e-fatura XML dosyası eklenir.</p></div>
-    <div class="ad"><div class="n">02</div><h3>Okuma</h3><p>Cari, tarih, kalem ve tutar bilgileri ayrıştırılır.</p></div>
-    <div class="ad on"><div class="n">03</div><h3>Doğrulama</h3><p>Okunanlar size gösterilir, gerekirse düzeltirsiniz.</p></div>
-    <div class="ad"><div class="n">04</div><h3>Kayıt</h3><p>Onaylanan belge cariye ve ürün geçmişine işlenir.</p></div>
-    <div class="ad"><div class="n">05</div><h3>Raporlama</h3><p>Bakiye, fiyat değişimi ve ekstre anında hazırdır.</p></div>
-  </div>
-</div></section>
-
-<section id="guvenlik"><div class="w gv2">
-  <div>
-    <div class="bas gor" style="margin-bottom:34px"><div class="tag">Güvenlik ve kontrol</div><h2>Kayıt düzeni, kontrol sizde kalacak şekilde kurgulandı.</h2></div>
-    <div class="liste gor">
-      <div><span class="no">01</span><span><h3>Onaysız kayıt yok</h3><p>Okunan her belge önce sizin onayınıza sunulur.</p></span></div>
-      <div><span class="no">02</span><span><h3>İşletmeye özel erişim</h3><p>Her kayıt yalnızca o işletmenin üyelerince okunur ve yazılır.</p></span></div>
-      <div><span class="no">03</span><span><h3>Yedek ve çevrimdışı çalışma</h3><p>Veriler dosya olarak indirilir. Bağlantı yokken girilen kayıtlar, bağlantı gelince eşitlenir.</p></span></div>
-    </div>
-  </div>
-  <div class="akisK gor">
-    <div class="tag" style="margin-bottom:8px">Belge durumu</div>
-    <div class="durumlar">
-      <div class="dr ok"><i class="nk"></i><span><b>Okundu</b><small>Örnek Toptan Gıda Ltd. · ÖRN-2026-0412</small></span><span class="tag">Otomatik</span></div>
-      <div class="dr ok"><i class="nk"></i><span><b>Fiyat karşılaştırması yapıldı</b><small>1 kalemde artış işaretlendi</small></span><span class="tag">Otomatik</span></div>
-      <div class="dr"><i class="nk"></i><span><b>Onayınız bekleniyor</b><small>Kayıt, onaydan sonra cariye işlenir</small></span><span class="tag" style="border-color:var(--teal);color:var(--teal)">Sizde</span></div>
-      <div class="dr"><i class="nk"></i><span><b>Kaydedildi</b><small>Bakiye ve ürün geçmişi güncellenir</small></span><span class="tag">Sonra</span></div>
-    </div>
-  </div>
-</div></section>
-
-<div class="cta2" id="iletisim"><div class="w">
-  <h2>Uygulamayı deneyin ya da bizimle görüşün.</h2>
-  <div style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç</a><a class="btn o" href="mailto:info@kasanot.com.tr">info@kasanot.com.tr</a></div>
-</div></div>
-</main>
-
-<footer><div class="w">
-  <div><a class="logo" href="./"><img src="favicon.svg" alt="" width="30" height="30">KasaNot</a><p style="max-width:30em">Küçük işletmeler için fatura, cari ve fiyat takibi. Resmî muhasebe ve e-defter yerine geçmez; yardımcı kayıt aracıdır.</p></div>
-  <div><h5>Erişim</h5><a href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç</a></div>
-  <div><h5>İletişim</h5><a href="mailto:info@kasanot.com.tr">info@kasanot.com.tr</a></div>
-  <div class="alt"><span>© 2026 KasaNot</span><span>Sayfadaki tüm kayıt ve tutarlar örnek veridir.</span></div>
-</div></footer>
-
+<div class="son" id="iletisim"><h2>Bugünkü faturayla başlayın.</h2><div class="cta"><a class="btn" href="https://dkcburak.github.io/kripto-kokpit/kasanot/">Uygulamayı aç →</a><a class="btn g" href="#iletisim">info@kasanot.com.tr</a></div></div>
+<footer><span>© 2026 KasaNot · Yardımcı kayıt aracıdır; resmî muhasebe ve e-defter yerine geçmez.</span><span>Ekranlardaki ve grafiklerdeki tüm veriler örnektir.</span></footer>
+</div>
 <script>
 (function(){
-var e=document.querySelectorAll('.gor');
-if(!('IntersectionObserver' in window)){e.forEach(function(x){x.classList.add('ac')})}
-else{var o=new IntersectionObserver(function(l){l.forEach(function(i){if(i.isIntersecting){i.target.classList.add('ac');o.unobserve(i.target)}})},{threshold:.1});e.forEach(function(x){o.observe(x)})}
-/* belge -> kayıt bağlantı çizgileri */
-var k=document.getElementById('kompo'),s=document.getElementById('bag');
-function ciz(){
-  if(!k||!s)return;s.innerHTML='';
-  if(getComputedStyle(s).display==='none')return;
-  var kb=k.getBoundingClientRect();s.setAttribute('viewBox','0 0 '+kb.width+' '+kb.height);
-  k.querySelectorAll('.hl').forEach(function(a){
-    var t=k.querySelector('.f[data-k="'+a.dataset.k+'"]');if(!t)return;
-    var ab=a.getBoundingClientRect(),tb=t.getBoundingClientRect();
-    var x1=ab.right-kb.left+3,y1=ab.top-kb.top+ab.height/2,x2=tb.left-kb.left-1,y2=tb.top-kb.top+tb.height/2,m=(x1+x2)/2;
-    var n='http://www.w3.org/2000/svg',p=document.createElementNS(n,'path');
-    p.setAttribute('d','M'+x1+' '+y1+' C'+m+' '+y1+','+m+' '+y2+','+x2+' '+y2);
-    p.setAttribute('fill','none');p.setAttribute('stroke','#0b6e66');p.setAttribute('stroke-width','1.5');p.setAttribute('stroke-dasharray','4 4');s.appendChild(p);
-    [[x1,y1],[x2,y2]].forEach(function(c){var d=document.createElementNS(n,'rect');d.setAttribute('x',c[0]-3);d.setAttribute('y',c[1]-3);d.setAttribute('width',6);d.setAttribute('height',6);d.setAttribute('fill','#0b6e66');s.appendChild(d)});
-  });
+var hp=document.getElementById('hp');
+if(hp&&matchMedia('(pointer:fine)').matches&&!matchMedia('(prefers-reduced-motion:reduce)').matches){
+ addEventListener('pointermove',function(e){var x=e.clientX/innerWidth-.5,y=e.clientY/innerHeight-.5;hp.style.transform='rotateY('+(-14+x*16)+'deg) rotateX('+(5-y*10)+'deg)'},{passive:true});
 }
-addEventListener('load',ciz);addEventListener('resize',ciz);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(ciz);
+var st=[].slice.call(document.querySelectorAll('.as')),im=[].slice.call(document.querySelectorAll('.stick img'));
+function sec(i){st.forEach(function(s,k){s.classList.toggle('on',k===i)});im.forEach(function(m,k){m.classList.toggle('on',k===i)})}
+if('IntersectionObserver' in window){
+ var o=new IntersectionObserver(function(l){l.forEach(function(e){if(e.isIntersecting)sec(+e.target.dataset.i)})},{rootMargin:'-45% 0px -45% 0px'});
+ st.forEach(function(s){o.observe(s)});
+}
 })();
 </script>
+
 </body>
 </html>
