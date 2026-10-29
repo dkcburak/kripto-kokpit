@@ -1,0 +1,32 @@
+# Range (yatay piyasa) al-sat backtest'i (test/backtest-range.js). MEXC açık verisi; anahtar yok, emir yok.
+name: backtest-range
+
+on:
+  workflow_dispatch:
+    inputs:
+      gun:
+        description: 'Kaç gün geriye'
+        default: '180'
+  push:
+    paths:
+      - 'test/backtest-range.js'
+      - '.github/workflows/backtest-range.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Backtest m15
+        run: node test/backtest-range.js "${{ github.event.inputs.gun || '180' }}" m15
+      - name: Backtest h1
+        run: node test/backtest-range.js "${{ github.event.inputs.gun || '180' }}" h1
