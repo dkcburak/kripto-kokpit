@@ -12,6 +12,7 @@ on:
       - 'test/backtest-range.js'
       - 'test/backtest-range2.js'
       - 'test/backtest-xs.js'
+      - 'test/backtest-carry.js'
       - '.github/workflows/backtest-range.yml'
 
 permissions:
@@ -30,3 +31,5 @@ jobs:
           node-version: '20'
       - name: Coinler arası momentum / ters dönüş (günlük)
         run: node test/backtest-xs.js 900
+      - name: Funding carry (spot al + vadeli short)
+        run: node test/backtest-carry.js 900
