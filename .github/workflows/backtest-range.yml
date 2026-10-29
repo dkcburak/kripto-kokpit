@@ -10,6 +10,7 @@ on:
   push:
     paths:
       - 'test/backtest-range.js'
+      - 'test/backtest-range2.js'
       - '.github/workflows/backtest-range.yml'
 
 permissions:
@@ -26,5 +27,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Backtest m15
-        run: node test/backtest-range.js "${{ github.event.inputs.gun || '180' }}" m15
+      - name: Backtest tur 2 (900 gün, 1S/4S, maker-limit, walk-forward)
+        run: node test/backtest-range2.js 900
