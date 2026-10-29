@@ -78,6 +78,7 @@ t('veto ya da B sınıfı sinyalde emir yok', function () {
 t('günlük -%20: yalnız botun kendi sonucu sayılır; elle işlemin zararı botu durdurmaz', function () {
   props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's'; props.BOT_RISK = '1';
   var gun = new Date().toISOString().slice(0, 10);
+  props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's';
   props.BOT_GUN = JSON.stringify({ tarih: gun, baslangic: 100, semboller: { XRP_USDT: 1 }, durdu: false });
   hesap(80); // hesap -20: elle işlem zararı
   cevap['/api/v1/private/position/list/history_positions'] = ok([{ symbol: 'XRP_USDT', realised: -1, closeTime: Date.now() }, { symbol: 'ETH_USDT', realised: -50, closeTime: Date.now() }]);
@@ -217,5 +218,26 @@ t('v1.8: gün içinde para yatırılırsa günlük sınır tabanı yükselir, d�
   assert.strictEqual(ctx.botGun(60).baslangic, 100, 'bakiye düşünce taban düşmez');
   assert.strictEqual(ctx.botGun(0).baslangic, 100, 'ozkaynak 0 (sembol ekleme çağrısı) tabanı bozmaz');
   var r = ctx.botGunlukZararAsildi(100.67); assert.strictEqual(r.sinir, -20);
+});
+t('v1.9: closeTime boşsa updateTime/createTime kullanılır, kapanan zarar günlük sonuca girer', function () {
+  assert.strictEqual(ctx.botKapanis({ closeTime: 5, updateTime: 6 }), 5);
+  assert.strictEqual(ctx.botKapanis({ updateTime: 6, createTime: 7 }), 6);
+  assert.strictEqual(ctx.botKapanis({ createTime: 7 }), 7);
+  assert.strictEqual(ctx.botKapanis({}), 0);
+  var gun = new Date().toISOString().slice(0, 10);
+  props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's';
+  props.BOT_GUN = JSON.stringify({ tarih: gun, baslangic: 100, semboller: { XRP_USDT: 1 }, durdu: false });
+  cevap['/api/v1/private/position/open_positions'] = ok([]);
+  cevap['/api/v1/private/position/list/history_positions'] = ok({ resultList: [{ symbol: 'XRP_USDT', realised: -7, updateTime: Date.now() }] });
+  var r = ctx.botGunlukZararAsildi(100); assert(Math.abs(r.sonuc + 7) < 1e-9 || r.sonuc === -7, 'kapanan zarar sayılmalı: ' + JSON.stringify(r));
+});
+t('v1.9: günlük özet sayaç ve bot durumunu mesaja yazar', function () {
+  var bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+  props.SINYAL_SAYAC = JSON.stringify({ gun: bugun, bolgede: { BTC: 1 }, sinyal: {}, durum: { BTC: '1S onayı yok' } });
+  props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's';
+  props.BOT_MODU = 'acik'; props.BOT_GUN = JSON.stringify({ tarih: bugun, baslangic: 100, semboller: {}, durdu: false }); hesap(100.67);
+  cevap['/api/v1/private/position/open_positions'] = ok([]);
+  mesajlar.length = 0; ctx.botGunlukOzet();
+  var m = mesajlar.join('\n'); assert(/Günlük özet/.test(m)); assert(/BTC/.test(m)); assert(/1S onayı yok/.test(m)); assert(/100\.67/.test(m));
 });
 console.log('\nSonuç: ' + n + ' geçti');

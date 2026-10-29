@@ -1,5 +1,5 @@
 /**
- * dKc Bot v1.8 (Google Apps Script, 2026-10-28) — Faz 2, bot 1: standart trend botu.
+ * dKc Bot v1.9 (Google Apps Script, 2026-10-29) — Faz 2, bot 1: standart trend botu.
  * Kod.gs ile aynı Apps Script projesine ayrı dosya olarak eklenir. Kod.gs sinyalKontrol, A/A+ sinyal bildirdiğinde botSinyal'i çağırır.
  *
  * Kurallar (Burak Bey, 20 Eki):
@@ -93,6 +93,8 @@ function botGun(ozkaynak) {
   return g;
 }
 function botGunSembolEkle(sembol) { var g = botGun(0); g.semboller[sembol] = 1; botProp().setProperty('BOT_GUN', JSON.stringify(g)); }
+// MEXC geçmiş pozisyonunda kapanış zamanı alanı: closeTime yoksa updateTime/createTime (29 Eki: closeTime boş geliyordu, günlük sınır kapanan zararı saymıyordu)
+function botKapanis(x) { return Number(x.closeTime) || Number(x.updateTime) || Number(x.createTime) || 0; }
 function botGunBaslangicMs(tarih) { return Date.parse(tarih + 'T00:00:00+03:00'); }
 // Botun bugünkü toplam sonucu (USDT): kapanan işlemlerin gerçekleşen kârı/zararı + açık botu pozisyonlarının anlık durumu.
 // Okunamazsa hata verir; çağıran taraf yeni emir vermez (güvenli taraf).
@@ -100,7 +102,7 @@ function botGunSonuc(g) {
   var semboller = g.semboller || {}, bas = botGunBaslangicMs(g.tarih), toplam = 0;
   if (!Object.keys(semboller).length) return 0;
   var gecmis = mexcIstek('get', '/api/v1/private/position/list/history_positions', { page_num: 1, page_size: 50 }) || [];
-  (gecmis.resultList || gecmis).forEach(function (x) { if (semboller[x.symbol] && Number(x.closeTime) >= bas) toplam += Number(x.realised) || 0; });
+  (gecmis.resultList || gecmis).forEach(function (x) { if (semboller[x.symbol] && botKapanis(x) >= bas) toplam += Number(x.realised) || 0; });
   botPozisyonlar().filter(function (x) { return semboller[x.symbol]; }).forEach(function (x) {
     var d = mexcAcik('/api/v1/contract/detail?symbol=' + x.symbol), t = mexcAcik('/api/v1/contract/ticker?symbol=' + x.symbol);
     var son = Number(t.lastPrice), ort = Number(x.holdAvgPrice), cs = Number(d.contractSize);
@@ -145,12 +147,13 @@ function botEmirHesap(plan, fiyat, toplam, sermaye, riskYuzde, detay, mini) {
 function botSinyal(c, s) {
   var mod = botModu(); if (mod === 'kapali') return null;
   if (!s || s.veto || (s.sinif !== 'A' && s.sinif !== 'A+')) return null;
+  botKayit('Sinyal alındı: ' + c.coin + ' ' + (c.plan && c.plan.yon === 'short' ? 'short' : 'long') + ' ' + s.sinif + ' (mod ' + mod + ')');
   var lock = LockService.getScriptLock(); if (!lock.tryLock(20000)) return null;
   try {
     var v = botVarlik(), gz = botGunlukZararAsildi(v.ozkaynak);
     if (gz.asildi) return botNot(mod, 'günlük zarar sınırı (botun kendi sonucu, -%' + BOT.gunlukZarar + ') doldu, ' + c.coin + ' sinyali atlandı');
     var poz = botPozisyonlar(), emir = botEmirler(), sembol = c.coin + '_USDT';
-    if (botKendi(poz).length + botKendi(emir).length >= BOT.maxAcik) return null;
+    if (botKendi(poz).length + botKendi(emir).length >= BOT.maxAcik) return botNot(mod, c.coin + ' atlandı: botun açık işlem sınırı dolu (' + BOT.maxAcik + ')');
     // Tek yön: açık pozisyon (elle açılan dahil) ters yöndeyse yeni emir yok (positionType 1 long, 2 short)
     var ters = poz.some(function (x) { return (Number(x.positionType) === 1 ? 'long' : 'short') !== c.plan.yon; });
     if (ters) return botNot(mod, c.coin + ' ' + c.plan.yon + ' atlandı: ters yönde açık pozisyon var');
@@ -226,6 +229,28 @@ function botBakim() {
 function botTetikKur() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'botBakim') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('botBakim').timeBased().everyMinutes(5).create();
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'botGunlukOzet') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('botGunlukOzet').timeBased().atHour(22).nearMinute(0).inTimezone('Europe/Istanbul').everyDays(1).create();
+}
+
+// ---------- Günlük özet (22:00 TR, botTetikKur kurar): "bugün neden işlem yok" sorusunun cevabı ----------
+// Kod.gs sinyalKontrol, SINYAL_SAYAC özelliğine bugünün bölgeye giren planlarını ve elenme nedenlerini yazar.
+function botGunlukOzet() {
+  var p = botProp(), bugun = Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd'), sy = {};
+  try { sy = JSON.parse(p.getProperty('SINYAL_SAYAC') || '{}') || {}; } catch (e) { sy = {}; }
+  var satir = ['📊 Günlük özet ' + bugun + ' · mod ' + botModu()];
+  if (sy.gun === bugun) {
+    var bolge = Object.keys(sy.bolgede || {}), sinyal = Object.keys(sy.sinyal || {}), durum = sy.durum || {};
+    satir.push('Giriş bölgesine giren plan: ' + (bolge.length ? bolge.join(', ') : 'yok'));
+    satir.push('A/A+ sinyal: ' + (sinyal.length ? sinyal.join(', ') : 'yok'));
+    var nedenler = Object.keys(durum).filter(function (k) { return !sy.sinyal || !sy.sinyal[k]; }).slice(0, 6).map(function (k) { return k + ' → ' + durum[k]; });
+    if (nedenler.length) satir.push('Elenme nedenleri:\n' + nedenler.join('\n'));
+  } else satir.push('Sinyal sayacı bugün yazılmadı (Kod.gs v11.5 yüklü mü, sinyalKontrol çalıştı mı?)');
+  try {
+    var v = botVarlik(), g = botGun(v.ozkaynak), sonuc = botGunSonuc(g);
+    satir.push('Bot: bakiye ' + v.ozkaynak.toFixed(2) + ' USDT, bugünkü sonuç ' + sonuc.toFixed(2) + ' USDT (sınır ' + (-g.baslangic * BOT.gunlukZarar / 100).toFixed(2) + '), açık pozisyon ' + botKendi(botPozisyonlar()).length);
+  } catch (e) { satir.push('Bot durumu okunamadı: ' + e.message); }
+  botBildir(satir.join('\n'));
 }
 
 // ---------- Takip ekranı için salt okunur durum (uygulamanın Bot sekmesi; emir vermez, anahtarı dışarı vermez) ----------
@@ -258,8 +283,9 @@ function botDurum() {
   } catch (e) { o.pozHata = e.message; o.uyarilar.push('Pozisyonlar okunamadı: ' + e.message); }
   try {
     var gecmis = mexcIstek('get', '/api/v1/private/position/list/history_positions', { page_num: 1, page_size: 20 }) || [];
-    o.gecmis = (gecmis.resultList || gecmis).slice(0, 15).map(function (x) {
-      return { sembol: x.symbol, yon: Number(x.positionType) === 1 ? 'long' : 'short', sonuc: Number(x.realised) || 0, kapanis: Number(x.closeTime) || 0 };
+    var gl = gecmis.resultList || gecmis; o.gecmisAlan = gl[0] ? Object.keys(gl[0]) : [];
+    o.gecmis = gl.slice(0, 15).map(function (x) {
+      return { sembol: x.symbol, yon: Number(x.positionType) === 1 ? 'long' : 'short', sonuc: Number(x.realised) || 0, kapanis: botKapanis(x) };
     });
   } catch (e) { o.gecmisHata = e.message; }
   try {
@@ -340,4 +366,4 @@ function botTestEmri(yon) {
   finally { lock.releaseLock(); }
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { BOT: BOT, botEmirHesap: botEmirHesap, mexcImza: mexcImza, botSinyal: botSinyal, botGunlukZararAsildi: botGunlukZararAsildi, botKillSwitch: botKillSwitch, botBakim: botBakim, botTestEmri: botTestEmri, botAnahtarHatirlat: botAnahtarHatirlat, botDurum: botDurum, botGun: botGun };
+if (typeof module !== 'undefined' && module.exports) module.exports = { BOT: BOT, botEmirHesap: botEmirHesap, mexcImza: mexcImza, botSinyal: botSinyal, botGunlukZararAsildi: botGunlukZararAsildi, botKillSwitch: botKillSwitch, botBakim: botBakim, botTestEmri: botTestEmri, botAnahtarHatirlat: botAnahtarHatirlat, botDurum: botDurum, botGun: botGun, botGunlukOzet: botGunlukOzet, botKapanis: botKapanis };
