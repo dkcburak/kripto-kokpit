@@ -28,5 +28,3 @@ jobs:
           node-version: '20'
       - name: Backtest m15
         run: node test/backtest-range.js "${{ github.event.inputs.gun || '180' }}" m15
-      - name: Backtest h1
-        run: node test/backtest-range.js "${{ github.event.inputs.gun || '180' }}" h1

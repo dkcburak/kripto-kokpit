@@ -29,6 +29,11 @@ async function getJson(url) {
   throw new Error('MEXC erişilemedi: ' + url);
 }
 async function mumlar(coin, bas, bit) {
+  if (process.env.SENTETIK) { // yerel kod testi için sahte veri (sonuç anlamsız)
+    var o = [], p = 100, tr = 0;
+    for (var t = bas; t < bit; t += M15) { if (Math.random() < 0.01) tr = (Math.random() - 0.5) * 0.004; var c = p * (1 + tr + (Math.random() - 0.5) * 0.006); o.push({ time: t, open: p, high: Math.max(p, c) * 1.001, low: Math.min(p, c) * 0.999, close: c }); p = c; }
+    return o;
+  }
   var out = [], seen = {};
   for (var s = bas; s < bit; s += M15 * 400) {
     var e = Math.min(bit, s + M15 * 400);
@@ -108,6 +113,41 @@ function mrKos(m, g, filtre, maliyet) {
   return islem;
 }
 
+// ---- MRX: MR'nin düzeltilmiş hali (parametreli) ----
+// ayar: k (bant sigma), minStop (stop mesafesi en az fiyatın % kaçı: maliyet/risk oranını sınırlar), htf (1S ADX de <20 olsun),
+//       adxDus (ADX bir önceki muma göre düşüyor olsun), hedefOran (hedef = girişten SMA'ya mesafenin oranı)
+function mrxKos(m, g, a1, ayar, maliyet) {
+  var islem = [], i = 21 + 14 * 3;
+  while (i < m.length - 2) {
+    var A = g.atr[i], X = g.adx[i], mu = g.sma[i], sd = g.sd[i];
+    if (!A || !X || !mu || X >= 20) { i++; continue; }
+    if (ayar.adxDus && !(g.adx[i - 1] !== null && X <= g.adx[i - 1])) { i++; continue; }
+    if (ayar.htf) { var h = a1[Math.floor(m[i].time / 3600) * 3600 - 3600]; if (h === undefined || h === null || h >= 20) { i++; continue; } }
+    var yon = m[i].close < mu - ayar.k * sd ? 1 : m[i].close > mu + ayar.k * sd ? -1 : 0;
+    if (!yon) { i++; continue; }
+    var giris = m[i + 1].open, risk = 1.5 * A;
+    if (risk / giris * 100 < ayar.minStop) { i++; continue; }
+    var stop = giris - yon * risk, hedef = giris + (mu - giris) * ayar.hedefOran;
+    if (yon * (hedef - giris) <= 0) { i++; continue; }
+    var cikis = null, k;
+    for (k = i + 1; k < Math.min(m.length, i + 1 + 48); k++) {
+      var hit = yon === 1 ? m[k].low <= stop : m[k].high >= stop;
+      var tp = yon === 1 ? m[k].high >= hedef : m[k].low <= hedef;
+      if (hit) { cikis = stop; break; }
+      if (tp) { cikis = hedef; break; }
+    }
+    if (cikis === null) { k = Math.min(m.length, i + 1 + 48) - 1; cikis = m[k].close; }
+    var brut = yon * (cikis - giris), ucret = maliyet * giris;
+    islem.push({ t: m[i].time, r: (brut - ucret) / (risk + ucret), rr: Math.abs(hedef - giris) / risk, stopYuzde: risk / giris * 100, stopla: cikis === stop });
+    i = k + 1;
+  }
+  return islem;
+}
+var MRX_AYARLAR = [];
+[2, 2.5].forEach(function (k) { [0, 0.3, 0.5].forEach(function (ms) { [false, true].forEach(function (htf) { [1, 0.7].forEach(function (ho) {
+  MRX_AYARLAR.push({ ad: 'k' + k + ' minStop%' + ms + (htf ? ' 1S-ADX' : '') + ' hedef' + ho, k: k, minStop: ms, htf: htf, hedefOran: ho, adxDus: true });
+}); }); }); });
+
 // ---- GRID ----
 function gridKos(m1, m15, g1, maliyet) {
   var islem = [], i = 60, ts = {};
@@ -160,12 +200,14 @@ function bol(liste) { liste = liste.sort(function (a, b) { return a.t - b.t; });
   var coinler = Object.keys(veri).filter(function (c) { return veri[c].length > 1000; });
   var ilk = veri[coinler[0]];
   console.log('Veri: ' + coinler.length + ' coin, ' + GUN + ' gün, ' + (ilk ? new Date(ilk[0].time * 1000).toISOString().slice(0, 10) + ' → ' + new Date(ilk[ilk.length - 1].time * 1000).toISOString().slice(0, 10) : '') + ', mum sayısı/coin ≈ ' + (ilk ? ilk.length : 0));
-  var sonuc = {};
-  MALIYET.forEach(function (c) { sonuc[c] = { MR: [], MR0: [], GRID: [] }; });
+  var sonuc = {}, mrx = {};
+  MALIYET.forEach(function (c) { sonuc[c] = { MR: [], MR0: [], GRID: [] }; mrx[c] = {}; MRX_AYARLAR.forEach(function (a) { mrx[c][a.ad] = []; }); });
   coinler.forEach(function (coin) {
     var m15 = veri[coin], m = TFARG === 'h1' ? topla(m15, 4) : m15, g = gosterge(m);
     var m1 = topla(m15, 4), g1 = TFARG === 'h1' ? g : gosterge(m1);
+    var a1 = {}; topla(m15, 4).forEach(function (x, ix) { a1[x.time] = g1.adx[ix]; });
     MALIYET.forEach(function (c) {
+      MRX_AYARLAR.forEach(function (a) { mrx[c][a.ad] = mrx[c][a.ad].concat(mrxKos(m, g, a1, a, c)); });
       sonuc[c].MR = sonuc[c].MR.concat(mrKos(m, g, true, c));
       sonuc[c].MR0 = sonuc[c].MR0.concat(mrKos(m, g, false, c));
       sonuc[c].GRID = sonuc[c].GRID.concat(gridKos(m1, m15, g1, c));
@@ -179,6 +221,14 @@ function bol(liste) { liste = liste.sort(function (a, b) { return a.t - b.t; });
       var fmt = function (o) { return o.n ? 'n=' + o.n + ' netR=' + o.netR + ' ortR=' + o.ortR + ' kazanç=' + o.kazanOran : 'n=0'; };
       console.log(ad.padEnd(5) + ' TÜMÜ: ' + fmt(ozet(sonuc[c][ad])) + ' | GELİŞTİRME: ' + fmt(ozet(b.gel)) + ' | TEST: ' + fmt(ozet(b.test)));
     });
+  });
+  console.log('\n##### MRX (düzeltilmiş MR) ayar taraması: sıralama yalnız GELİŞTİRME netR(0,10%) ile; TEST sütunu dokunulmamış son %30 #####');
+  var fmt2 = function (o) { return o.n ? 'n=' + o.n + ' ortR=' + o.ortR + ' kazanç=' + o.kazanOran : 'n=0'; };
+  var sira = MRX_AYARLAR.slice().sort(function (x, y) { return ozet(bol(mrx[0.001][y.ad]).gel).ortR - ozet(bol(mrx[0.001][x.ad]).gel).ortR; });
+  sira.forEach(function (a) {
+    var satir = a.ad.padEnd(40);
+    [0, 0.0004, 0.001, 0.002].forEach(function (c) { var b = bol(mrx[c][a.ad]); satir += ' | ' + (c * 100).toFixed(2) + '% GEL ' + fmt2(ozet(b.gel)) + ' TEST ' + fmt2(ozet(b.test)); });
+    console.log(satir);
   });
   var gs = sonuc[0.001].GRID; if (gs.length) console.log('\nGRID (maliyet 0,10%): grid sayısı ' + gs.length + ', stop ile biten ' + gs.filter(function (x) { return x.stop; }).length + ', ortalama dolum ' + (gs.reduce(function (a, x) { return a + x.fills; }, 0) / gs.length).toFixed(1));
   var mr = sonuc[0.001].MR; if (mr.length) console.log('MR (0,10%): ortalama stop mesafesi %' + (mr.reduce(function (a, x) { return a + x.stopYuzde; }, 0) / mr.length).toFixed(2) + ', stop ile biten ' + (mr.filter(function (x) { return x.stopla; }).length / mr.length * 100).toFixed(0) + '%, ortalama hedef/risk oranı ' + (mr.reduce(function (a, x) { return a + x.rr; }, 0) / mr.length).toFixed(2));
