@@ -11,6 +11,7 @@ on:
     paths:
       - 'test/backtest-range.js'
       - 'test/backtest-range2.js'
+      - 'test/backtest-xs.js'
       - '.github/workflows/backtest-range.yml'
 
 permissions:
@@ -29,3 +30,5 @@ jobs:
           node-version: '20'
       - name: Backtest tur 2 (900 gün, 1S/4S, maker-limit, walk-forward)
         run: node test/backtest-range2.js 900
+      - name: Coinler arası momentum / ters dönüş (günlük)
+        run: node test/backtest-xs.js 900
