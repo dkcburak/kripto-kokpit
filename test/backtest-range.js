@@ -17,7 +17,7 @@ var GUN = Number(process.argv[2]) || 180;
 var TFARG = process.argv[3] || 'm15';
 var COINLER = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'DOGE', 'ADA', 'LINK', 'TIA', 'INJ', 'XMR', 'WLD', 'ENA', 'HYPE', 'NEAR', 'SUI'];
 var M15 = 900;
-var MALIYET = [0.0004, 0.001, 0.002];
+var MALIYET = [0, 0.0004, 0.001, 0.002]; // 0 = ücretsiz dünya: zararın nedeni maliyet mi kontrolü
 
 function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 async function getJson(url) {
@@ -102,7 +102,7 @@ function mrKos(m, g, filtre, maliyet) {
     }
     if (cikis === null) { k = Math.min(m.length, i + 1 + 48) - 1; cikis = m[k].close; }
     var brut = yon * (cikis - giris), ucret = maliyet * giris;
-    islem.push({ t: m[i].time, r: (brut - ucret) / (risk + ucret), rr: rr });
+    islem.push({ t: m[i].time, r: (brut - ucret) / (risk + ucret), rr: rr, stopYuzde: risk / giris * 100, stopla: cikis === stop });
     i = k + 1;
   }
   return islem;
@@ -181,5 +181,5 @@ function bol(liste) { liste = liste.sort(function (a, b) { return a.t - b.t; });
     });
   });
   var gs = sonuc[0.001].GRID; if (gs.length) console.log('\nGRID (maliyet 0,10%): grid sayısı ' + gs.length + ', stop ile biten ' + gs.filter(function (x) { return x.stop; }).length + ', ortalama dolum ' + (gs.reduce(function (a, x) { return a + x.fills; }, 0) / gs.length).toFixed(1));
-  var mr = sonuc[0.001].MR; if (mr.length) console.log('MR (0,10%): ortalama hedef/risk oranı ' + (mr.reduce(function (a, x) { return a + x.rr; }, 0) / mr.length).toFixed(2));
+  var mr = sonuc[0.001].MR; if (mr.length) console.log('MR (0,10%): ortalama stop mesafesi %' + (mr.reduce(function (a, x) { return a + x.stopYuzde; }, 0) / mr.length).toFixed(2) + ', stop ile biten ' + (mr.filter(function (x) { return x.stopla; }).length / mr.length * 100).toFixed(0) + '%, ortalama hedef/risk oranı ' + (mr.reduce(function (a, x) { return a + x.rr; }, 0) / mr.length).toFixed(2));
 })().catch(function (e) { console.error(e); process.exit(1); });
