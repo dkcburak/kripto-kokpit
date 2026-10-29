@@ -28,7 +28,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Backtest tur 2 (900 gün, 1S/4S, maker-limit, walk-forward)
-        run: node test/backtest-range2.js 900
       - name: Coinler arası momentum / ters dönüş (günlük)
         run: node test/backtest-xs.js 900

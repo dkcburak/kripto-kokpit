@@ -43,7 +43,7 @@ function f(o) { return o.n < 3 ? 'n=' + o.n : 'n=' + o.n + ' haftalık ort=' + (
   [0.0014, 0.0028].forEach(function (mal) {
     console.log('\n=== Haftalık maliyet ' + (mal * 100).toFixed(2) + '% (brüt notional) ===');
     var satir = sonuc.map(function (s) {
-      var net = s.seri.map(function (x) { return { t: x.t, r: x.b - mal / 2 }; }); // spread zaten /2 brüt; maliyet brüt notional üzerinden /2 ile karşılaştırılabilir
+      var net = s.seri.map(function (x) { return { t: x.t, r: x.b - mal }; }); // getiri brüt notional başına; maliyet de brüt notional başına (haftalık gidiş-dönüş)
       var tr = net.filter(function (x) { return x.t < t1; }).map(function (x) { return x.r; }), va = net.filter(function (x) { return x.t >= t1 && x.t < t2; }).map(function (x) { return x.r; }), te = net.filter(function (x) { return x.t >= t2; }).map(function (x) { return x.r; });
       return { ad: s.ad, tr: ist(tr), va: ist(va), te: ist(te) };
     }).sort(function (a, b) { return (isNaN(b.tr.ort) ? -9 : b.tr.ort) - (isNaN(a.tr.ort) ? -9 : a.tr.ort); });
