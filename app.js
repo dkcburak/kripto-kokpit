@@ -7,6 +7,8 @@
   // ---------- Cihazda saklanan bilgiler (yalnızca bu telefonda/bilgisayarda) ----------
   function oku(k, vars) { try { var v = localStorage.getItem(k); return v == null ? vars : JSON.parse(v); } catch (e) { return vars; } }
   function yaz(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* gizli mod: sessizce geç */ } }
+  // Tarayıcıdan 'kalıcı depolama' iste: eşleme belirteci (dkc-cihaz) sistem temizliğinde silinmesin
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* desteklenmiyor */ }
 
   var durum = {
     veri: null, sonBasari: 0, hata: '', yukleniyor: false, onbellek: false,
