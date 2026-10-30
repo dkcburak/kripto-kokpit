@@ -4,7 +4,7 @@
 var path = require('path'), fs = require('fs');
 var ANA = path.resolve(process.env.ANA || '.');
 var T = require(path.join(ANA, 'tarayici/tara.js'));
-var GUN = Number(process.env.GUN || 160);
+var GUN = Number(process.env.GUN || 160), TARAMA_SAAT = 3 * 4;   // plan en çok 12 saat beklenir
 var bekle = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 async function getJson(url) {
   for (var d = 0; d < 3; d++) { await bekle(150); try { var r = await fetch(url); if (r.ok) return await r.json(); } catch (e) { /* tekrar */ } await bekle(1000); }
@@ -15,7 +15,8 @@ function mumlar(j, adim, sn) {
   return d.time.map(function (x, n) { return { time: x, open: +d.open[n], high: +d.high[n], low: +d.low[n], close: +d.close[n] }; }).filter(function (m) { return m.time + adim <= sn; });
 }
 // Slot sayısı ve yön kısıtıyla yürüt. Kazanç +tp1R, kayıp -1 (R birimi: risk + ücret).
-function yurut(veri, slot, yonler, bas, son) {
+function yurut(veri, slot, yonler, bas, son, rejim) {
+  var btc = veri.filter(function (c) { return c.ad === 'BTC'; })[0];
   var tp = T.AYAR.tp1R, acik = [], bekleyen = [], islem = [];
   var zamanlar = {};
   veri.forEach(function (c) { c.h4.forEach(function (m) { zamanlar[m.time] = 1; }); });
@@ -46,13 +47,17 @@ function yurut(veri, slot, yonler, bas, son) {
       if (acik.some(function (p) { return p.coin === c; }) || bekleyen.some(function (p) { return p.coin === c; })) return;
       var kesit = c.h4.slice(0, k + 1), gun = c.d.filter(function (m) { return m.time + 86400 <= t + 14400; });
       var o = T.planUret(c.ad, { d: gun, h4: kesit }, kesit[k].close, undefined, i < T.AYAR.shortIlk);
+      if (o.plan && rejim && btc) {
+        var tr = T.trend(btc.d.filter(function (m) { return m.time + 86400 <= t + 14400; }));
+        if (!((o.plan.yon === 'long' && tr === 'yukari') || (o.plan.yon === 'short' && tr === 'asagi'))) return;
+      }
       if (o.plan && yonler.indexOf(o.plan.yon) >= 0) bekleyen.push({ coin: c, plan: o.plan, t: t });
     });
   });
   return islem;
 }
 function ozet(islem) {
-  if (!islem.length) return { n: 0, kazan: 0, toplam: 0, ort: 0, dd: 0 };
+  if (!islem.length) return { n: 0, kazan: 0, toplam: 0, ort: 0, dd: 0, gunluk: 0 };
   var top = 0, tepe = 0, dd = 0, kz = 0;
   islem.slice().sort(function (a, b) { return a.t - b.t; }).forEach(function (x) { top += x.r; if (x.r > 0) kz++; tepe = Math.max(tepe, top); dd = Math.max(dd, tepe - top); });
   return { n: islem.length, kazan: kz / islem.length * 100, toplam: top, ort: top / islem.length, dd: dd };
@@ -74,11 +79,11 @@ function ozet(islem) {
   }
   var bas = sn - 86400 * GUN, orta = bas + (sn - bas) * 0.6, md = '# Çok slotlu tarayıcı testi\n\n' + new Date(simdi).toISOString() + ', ' + veri.length + ' coin, ' + GUN + ' gün 4S. Plan = tarayıcı kuralı (tp1R ' + T.AYAR.tp1R + ' net). R birimi: risk+ücret. Filtre yok (1S onay, BTC farkı, skor YOK). Aynı mumda stop ve hedef = stop. Slipaj/funding yok. Coin listesi bugünün hacim listesi (hayatta kalma yanlılığı var).\n\n';
   md += '| Slot | Yön | Dilim | İşlem | Kazanç % | Toplam R | Ort R | MaxDD R |\n|---|---|---|---|---|---|---|---|\n';
-  [[1, ['long', 'short']], [3, ['long', 'short']], [5, ['long', 'short']], [3, ['long']], [3, ['short']]].forEach(function (cfg) {
-    var tum = yurut(veri, cfg[0], cfg[1], bas, sn);
+  [[1, ['long', 'short'], true], [3, ['long', 'short'], true], [5, ['long', 'short'], true], [1, ['long', 'short']]].forEach(function (cfg) {
+    var tum = yurut(veri, cfg[0], cfg[1], bas, sn, cfg[2]);
     [['hepsi', tum], ['TRAIN (ilk %60)', tum.filter(function (x) { return x.t < orta; })], ['TEST (son %40)', tum.filter(function (x) { return x.t >= orta; })]].forEach(function (b) {
       var s = ozet(b[1]);
-      md += '| ' + cfg[0] + ' | ' + cfg[1].join('+') + ' | ' + b[0] + ' | ' + s.n + ' | ' + s.kazan.toFixed(0) + ' | ' + s.toplam.toFixed(1) + ' | ' + s.ort.toFixed(2) + ' | ' + s.dd.toFixed(1) + ' |\n';
+      md += '| ' + cfg[0] + ' | ' + cfg[1].join('+') + (cfg[2] ? ' +BTC1G rejim' : '') + ' | ' + b[0] + ' | ' + s.n + ' | ' + s.kazan.toFixed(0) + ' | ' + s.toplam.toFixed(1) + ' | ' + s.ort.toFixed(2) + ' | ' + s.dd.toFixed(1) + ' |\n';
     });
   });
   fs.writeFileSync(process.argv[2] || 'cok-slot.md', md); console.log(md);
