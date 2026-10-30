@@ -1,0 +1,22 @@
+# Tek seferlik: tarayıcı kuralı çok slotlu çalışsa ne olurdu? Salt okuma, emir yok.
+name: cok-slot
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-qb1mbc]
+    paths: ['.github/workflows/cok-slot.yml', 'test/cok-slot.js']
+permissions:
+  contents: read
+jobs:
+  analiz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, path: ana, persist-credentials: false }
+      - uses: actions/checkout@v4
+        with: { path: dal, persist-credentials: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: ANA=ana node dal/test/cok-slot.js "$RUNNER_TEMP/cok-slot.md"
+      - run: cat "$RUNNER_TEMP/cok-slot.md" >> "$GITHUB_STEP_SUMMARY"
