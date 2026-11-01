@@ -1,0 +1,44 @@
+# dKc kırılım KURU izleme: saatte bir MEXC açık verisiyle yalnız long hacimli kırılım sinyallerini tarar ve
+# "olsaydı ne olurdu" günlüğünü kirilim-veri dalında kirilim.json olarak tutar. Gerçek emir yok, anahtar yok.
+# Geriye dönük testin (300 gün) ileriye dönük doğrulamasıdır; sonuç 3-4 hafta sonra okunur.
+name: kirilim-izleme
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kirilim-izleme
+  cancel-in-progress: false
+
+jobs:
+  izle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Testler
+        run: node test/kirilim-izle.test.js
+      - name: Önceki durum (varsa)
+        run: |
+          git fetch --depth=1 "https://github.com/${{ github.repository }}.git" kirilim-veri 2>/dev/null && git show FETCH_HEAD:kirilim.json > "$RUNNER_TEMP/onceki.json" || echo "önceki durum yok, sıfırdan başlanır"
+      - name: İzle
+        run: node tarayici/kirilim.js "$RUNNER_TEMP/onceki.json" "$RUNNER_TEMP/kirilim.json"
+      - name: Yayınla (kirilim-veri dalı, tek commit)
+        run: |
+          cd "$RUNNER_TEMP"
+          rm -rf yayin && mkdir yayin && cd yayin
+          git init -q -b kirilim-veri
+          cp "$RUNNER_TEMP/kirilim.json" .
+          git -c user.name="dkc-kirilim" -c user.email="dkc-kirilim@users.noreply.github.com" add kirilim.json
+          git -c user.name="dkc-kirilim" -c user.email="dkc-kirilim@users.noreply.github.com" commit -q -m "izleme $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" kirilim-veri
