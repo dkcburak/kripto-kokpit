@@ -18,5 +18,6 @@ jobs:
         with: { path: dal, persist-credentials: false }
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: ANA=ana node dal/test/kirilim.js "$RUNNER_TEMP/kirilim.md"
-      - run: cat "$RUNNER_TEMP/kirilim.md" >> "$GITHUB_STEP_SUMMARY"
+      - run: ANA=ana OFF=40 node dal/test/kirilim.js "$RUNNER_TEMP/k-diger.md"
+      - run: ANA=ana GUN=300 node dal/test/kirilim.js "$RUNNER_TEMP/k-uzun.md"
+      - run: cat "$RUNNER_TEMP/k-diger.md" "$RUNNER_TEMP/k-uzun.md" >> "$GITHUB_STEP_SUMMARY"

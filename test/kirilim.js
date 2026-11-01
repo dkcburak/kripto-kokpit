@@ -4,7 +4,7 @@
 var path = require('path'), fs = require('fs');
 var ANA = path.resolve(process.env.ANA || '.');
 var T = require(path.join(ANA, 'tarayici/tara.js'));
-var GUN = Number(process.env.GUN || 160), UCRET = 0.001;
+var GUN = Number(process.env.GUN || 160), UCRET = 0.001, OFF = Number(process.env.OFF || 0);
 var bekle = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 async function getJson(url) {
   for (var d = 0; d < 3; d++) { await bekle(150); try { var r = await fetch(url); if (r.ok) return await r.json(); } catch (e) { /* tekrar */ } await bekle(1000); }
@@ -63,7 +63,7 @@ function ozet(islem) {
   var simdi = Date.now(), sn = Math.floor(simdi / 1000);
   var t = await getJson('https://contract.mexc.com/api/v1/contract/ticker'), tradfi = {};
   try { var dt = await getJson('https://contract.mexc.com/api/v1/contract/detail'); dt.data.forEach(function (d) { if (T.tradfiMi(d)) tradfi[d.symbol] = true; }); } catch (e) { /* ad listesiyle devam */ }
-  var liste = T.evren(t.data, tradfi).slice(0, T.AYAR.coinSayisi), veri = [];
+  var liste = T.evren(t.data, tradfi).slice(OFF, OFF + T.AYAR.coinSayisi), veri = [];
   for (var i = 0; i < liste.length; i++) {
     try {
       var h4 = mumlar(await getJson('https://contract.mexc.com/api/v1/contract/kline/' + liste[i].coin + '_USDT?interval=Hour4&start=' + (sn - 86400 * (GUN + 40)) + '&end=' + sn), 14400, sn);
@@ -74,9 +74,9 @@ function ozet(islem) {
     } catch (e) { /* coin atlanır */ }
   }
   var bas = sn - 86400 * GUN, orta = bas + (sn - bas) * 0.6;
-  var md = '# Hacimli kırılım testi\n\n' + new Date(simdi).toISOString() + ', ' + veri.length + ' coin, ' + GUN + ' gün 4S. Sinyal: 4S kapanış önceki 20 mumun zirvesini/dibini aşar ve hacim ≥ K × 20 mum ortalaması; giriş sonraki mum açılışı; stop = A × ATR14; hedef net 2R; en çok T mum (4S) tutulur. Ücret dahil (R = risk+ücret), slipaj yok, aynı mumda stop ve hedef = stop. Coin listesi bugünün hacim listesi.\n\n';
+  var md = '# Hacimli kırılım testi\n\n' + new Date(simdi).toISOString() + ', ' + veri.length + ' coin (hacim sırası ' + (OFF + 1) + '-' + (OFF + T.AYAR.coinSayisi) + '), ' + GUN + ' gün 4S. Sinyal: 4S kapanış önceki 20 mumun zirvesini/dibini aşar ve hacim ≥ K × 20 mum ortalaması; giriş sonraki mum açılışı; stop = A × ATR14; hedef net 2R; en çok T mum (4S) tutulur. Ücret dahil (R = risk+ücret), slipaj yok, aynı mumda stop ve hedef = stop. Coin listesi bugünün hacim listesi.\n\n';
   md += '| Slot | K | A | T | Yön | Dilim | İşlem | Kazanç % | Toplam R | Ort R | MaxDD R |\n|---|---|---|---|---|---|---|---|---|---|---|\n';
-  [[3, 2.5, 2, 12, 'long+short'], [3, 2.5, 2, 12, 'long'], [3, 2.5, 2, 12, 'short'], [3, 4, 2, 12, 'long'], [3, 4, 2, 12, 'short'], [1, 4, 1.5, 6, 'long'], [1, 4, 1.5, 6, 'short']].forEach(function (cfg) {
+  [[3, 2.5, 2, 12, 'long'], [3, 2.5, 2, 12, 'short'], [3, 4, 2, 12, 'long'], [1, 4, 1.5, 6, 'long']].forEach(function (cfg) {
     var tum = yurut(veri, cfg[0], bas, sn, cfg[1], cfg[2], cfg[3], cfg[4].split('+'));
     [['hepsi', tum], ['TRAIN', tum.filter(function (x) { return x.t < orta; })], ['TEST', tum.filter(function (x) { return x.t >= orta; })]].forEach(function (b) {
       var s = ozet(b[1]);
