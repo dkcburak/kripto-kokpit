@@ -27,13 +27,13 @@ function sinyal(c, k, volK) {
   var yon = h[k].close > yuk ? 'long' : h[k].close < dus ? 'short' : null;
   return yon ? { yon: yon, oran: h[k].vol / hv, atr: atr14(h, k) } : null;
 }
-function yurut(veri, slot, bas, son, volK, atrK, tutma) {
+function yurut(veri, slot, bas, son, volK, atrK, tutma, yonler) {
   var acik = [], sin = [], islem = [], zam = {};
   veri.forEach(function (c) { c.h4.forEach(function (m) { zam[m.time] = 1; }); });
   var ts = Object.keys(zam).map(Number).sort(function (a, b) { return a - b; }).filter(function (t) { return t >= bas && t <= son; });
   ts.forEach(function (t) {
     sin.sort(function (a, b) { return b.oran - a.oran; }).forEach(function (s) {
-      var m = s.coin.byTime[t]; if (!m || acik.length >= slot || acik.some(function (p) { return p.coin === s.coin; })) return;
+      var m = s.coin.byTime[t]; if (!m || yonler.indexOf(s.yon) < 0 || acik.length >= slot || acik.some(function (p) { return p.coin === s.coin; })) return;
       var lng = s.yon === 'long', risk = atrK * s.atr, u = UCRET * m.open;
       acik.push({ coin: s.coin, yon: s.yon, t: t, giris: m.open, risk: risk, u: u, stop: lng ? m.open - risk : m.open + risk, tp: lng ? m.open + 2 * (risk + u) + u : m.open - (2 * (risk + u) + u), say: 0 });
     });
@@ -75,9 +75,9 @@ function ozet(islem) {
   }
   var bas = sn - 86400 * GUN, orta = bas + (sn - bas) * 0.6;
   var md = '# Hacimli kırılım testi\n\n' + new Date(simdi).toISOString() + ', ' + veri.length + ' coin, ' + GUN + ' gün 4S. Sinyal: 4S kapanış önceki 20 mumun zirvesini/dibini aşar ve hacim ≥ K × 20 mum ortalaması; giriş sonraki mum açılışı; stop = A × ATR14; hedef net 2R; en çok T mum (4S) tutulur. Ücret dahil (R = risk+ücret), slipaj yok, aynı mumda stop ve hedef = stop. Coin listesi bugünün hacim listesi.\n\n';
-  md += '| Slot | K | A | T | Dilim | İşlem | Kazanç % | Toplam R | Ort R | MaxDD R |\n|---|---|---|---|---|---|---|---|---|---|\n';
-  [[1, 2.5, 1.5, 6], [3, 2.5, 1.5, 6], [1, 4, 1.5, 6], [3, 4, 1.5, 6], [3, 2.5, 2, 12], [3, 4, 2, 12]].forEach(function (cfg) {
-    var tum = yurut(veri, cfg[0], bas, sn, cfg[1], cfg[2], cfg[3]);
+  md += '| Slot | K | A | T | Yön | Dilim | İşlem | Kazanç % | Toplam R | Ort R | MaxDD R |\n|---|---|---|---|---|---|---|---|---|---|---|\n';
+  [[3, 2.5, 2, 12, 'long+short'], [3, 2.5, 2, 12, 'long'], [3, 2.5, 2, 12, 'short'], [3, 4, 2, 12, 'long'], [3, 4, 2, 12, 'short'], [1, 4, 1.5, 6, 'long'], [1, 4, 1.5, 6, 'short']].forEach(function (cfg) {
+    var tum = yurut(veri, cfg[0], bas, sn, cfg[1], cfg[2], cfg[3], cfg[4].split('+'));
     [['hepsi', tum], ['TRAIN', tum.filter(function (x) { return x.t < orta; })], ['TEST', tum.filter(function (x) { return x.t >= orta; })]].forEach(function (b) {
       var s = ozet(b[1]);
       md += '| ' + cfg.join(' | ') + ' | ' + b[0] + ' | ' + s.n + ' | ' + s.kazan.toFixed(0) + ' | ' + s.toplam.toFixed(1) + ' | ' + s.ort.toFixed(2) + ' | ' + s.dd.toFixed(1) + ' |\n';
