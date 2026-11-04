@@ -47,14 +47,15 @@
     for (i = n; i < kap.length; i++) e = kap[i] * k + e * (1 - k);
     return e;
   }
-  // Tek trend tanımı (uygulama, sunucu, tarayıcı aynı): kapanmış mumlarda kapanış ve EMA20 EMA50'nin üstündeyse yukari,
-  // ikisi de altındaysa asagi, aksi yatay. mumlar: [{ close }] eskiden yeniye. 50 mumdan azsa null.
+  // Tek trend tanımı (uygulama, sunucu, tarayıcı aynı): kapanmış mumlarda kapanış hem EMA20 hem EMA50'nin üstündeyse yukari,
+  // ikisinin de altındaysa asagi, aksi yatay. mumlar: [{ close }] eskiden yeniye. 50 mumdan azsa null.
   function trendEma(mumlar) {
     var kap = (mumlar || []).map(function (m) { return Number(m.close); }).filter(function (x) { return x > 0; });
     var e20 = emaSon(kap, 20), e50 = emaSon(kap, 50), c = kap[kap.length - 1];
     if (e20 == null || e50 == null) return null;
-    if (c > e50 && e20 > e50) return 'yukari';
-    if (c < e50 && e20 < e50) return 'asagi';
+    // v2 (4 Kas 2026): EMA20-EMA50 sırası gecikmeli; fiyat iki EMA'nın da üstündeyse yukari, altındaysa asagi (yükselişte short üretmesin).
+    if (c > e50 && c > e20) return 'yukari';
+    if (c < e50 && c < e20) return 'asagi';
     return 'yatay';
   }
 

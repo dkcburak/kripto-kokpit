@@ -314,10 +314,17 @@ t('trendEma: tek trend tanımı', function () {
   for (i = 0; i < 80; i++) { yuk.push({ close: 100 + i }); dus.push({ close: 200 - i }); }
   assert.strictEqual(H.trendEma(yuk), 'yukari'); assert.strictEqual(H.trendEma(dus), 'asagi');
   assert.strictEqual(H.trendEma(yuk.slice(0, 40)), null);
-  // yükselişten sonra sert düşüş: kapanış EMA50 altına indi ama EMA20 hâlâ üstte -> yatay
+  // yükselişten sonra sert düşüş: kapanış EMA20 ve EMA50 altına indi -> asagi
   var don = yuk.slice(); for (i = 0; i < 6; i++) don.push({ close: 150 - i * 4 });
-  assert.strictEqual(H.trendEma(don), 'yatay');
+  assert.strictEqual(H.trendEma(don), 'asagi');
+  // yükselişte küçük geri çekilme: kapanış EMA20 altında, EMA50 üstünde -> yatay
+  var geri = yuk.slice(); geri.push({ close: 165 });
+  assert.strictEqual(H.trendEma(geri), 'yatay');
+  // 4 Kas 2026 hatası: düşüşten sonra sert toparlanma; kapanış iki EMA'nın da üstünde -> yukari
+  var top = dus.slice(); for (i = 0; i < 8; i++) top.push({ close: 125 + i * 6 });
+  assert.strictEqual(H.trendEma(top), 'yukari');
 });
+
 t('pusula: aynı anda tek yön', function () {
   var dm = function (u, b) { return { usdt: { deger: 6.7, h4: u, d: 'yatay' }, btc: { deger: 60, h4: b, d: 'yatay' } }; };
   assert.strictEqual(H.pusula(null), null); assert.strictEqual(H.pusula({ mod: 'Temkinli' }), null); // veri yoksa kural uygulanmaz
