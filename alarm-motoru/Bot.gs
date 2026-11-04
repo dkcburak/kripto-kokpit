@@ -1,5 +1,5 @@
 /**
- * dKc Bot v2.0 (Google Apps Script, 2026-11-04; v1.9 + short kapalı) — Faz 2, bot 1: standart trend botu.
+ * dKc Bot v2.1 (Google Apps Script, 2026-11-04; v1.9 + short kapalı + en fazla 2 işlem) — Faz 2, bot 1: standart trend botu.
  * Kod.gs ile aynı Apps Script projesine ayrı dosya olarak eklenir. Kod.gs sinyalKontrol, A/A+ sinyal bildirdiğinde botSinyal'i çağırır.
  *
  * Kurallar (Burak Bey, 20 Eki):
@@ -25,7 +25,7 @@ var BOT = {
   riskVarsayilan: 0.25, // işlem başı risk %, bot payının yüzdesi değil toplam bakiyenin yüzdesi
   riskTavan: 3,         // toplam açık risk %
   gunlukZarar: 20,      // günlük zarar sınırı % (Burak Bey, 27 Eki 2026: 100 USDT bakiyede 20 USDT)
-  maxAcik: 1,           // bot 1 aynı anda en fazla 1 işlem
+  maxAcik: 2,           // aynı anda en fazla 2 işlem (Burak Bey, 4 Kas 2026; önceden 1)
   emirOmruDk: 60,       // dolmayan limit emir 60 dakika sonra iptal
   kalMin: 5, kalMax: 10,
   shortKapali: true     // Burak Bey, 4 Kas 2026: short işlem açılmaz (yalnız long)

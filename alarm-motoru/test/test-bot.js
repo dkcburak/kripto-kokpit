@@ -108,6 +108,13 @@ t('günlük zarar okunamazsa güvenli taraf: emir yok, hata bildirilir', functio
   ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: LONG }, { sinif: 'A' });
   assert(!istekler.some(function (x) { return /order\/create/.test(x.url); })); assert(/Hata/.test(mesajlar[0]));
 });
+t('en fazla 2 işlem: iki bot işlemi açıkken üçüncü sinyal atlanır', function () {
+  props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's'; hesap(100);
+  props.BOT_SEMBOLLER = JSON.stringify({ ETH_USDT: 1, XRP_USDT: 1 });
+  cevap['/api/v1/private/position/open_positions'] = ok([{ symbol: 'ETH_USDT', positionType: 1, holdVol: 1 }, { symbol: 'XRP_USDT', positionType: 1, holdVol: 1 }]);
+  ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: LONG }, { sinif: 'A' });
+  assert(!istekler.some(function (x) { return /order\/create/.test(x.url); })); assert(/işlem sınırı dolu \(2\)/.test(mesajlar[0]));
+});
 t('short kapalı: short sinyal emir açmaz, long etkilenmez', function () {
   props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's'; hesap(100);
   ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: { yon: 'short', giris: [100, 101], stop: 104, tp1: 94 } }, { sinif: 'A+' });
@@ -237,7 +244,7 @@ t('v1.9: closeTime boşsa updateTime/createTime kullanılır, kapanan zarar gün
   var r = ctx.botGunlukZararAsildi(100); assert(Math.abs(r.sonuc + 7) < 1e-9 || r.sonuc === -7, 'kapanan zarar sayılmalı: ' + JSON.stringify(r));
 });
 t('v1.9: günlük özet sayaç ve bot durumunu mesaja yazar', function () {
-  var bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+  var bugun = new Date().toISOString().slice(0, 10); // mock formatDate UTC verir
   props.SINYAL_SAYAC = JSON.stringify({ gun: bugun, bolgede: { BTC: 1 }, sinyal: {}, durum: { BTC: '1S onayı yok' } });
   props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's';
   props.BOT_MODU = 'acik'; props.BOT_GUN = JSON.stringify({ tarih: bugun, baslangic: 100, semboller: {}, durdu: false }); hesap(100.67);
