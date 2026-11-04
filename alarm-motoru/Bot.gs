@@ -1,5 +1,5 @@
 /**
- * dKc Bot v1.9 (Google Apps Script, 2026-10-29) — Faz 2, bot 1: standart trend botu.
+ * dKc Bot v2.0 (Google Apps Script, 2026-11-04; v1.9 + short kapalı) — Faz 2, bot 1: standart trend botu.
  * Kod.gs ile aynı Apps Script projesine ayrı dosya olarak eklenir. Kod.gs sinyalKontrol, A/A+ sinyal bildirdiğinde botSinyal'i çağırır.
  *
  * Kurallar (Burak Bey, 20 Eki):
@@ -27,7 +27,8 @@ var BOT = {
   gunlukZarar: 20,      // günlük zarar sınırı % (Burak Bey, 27 Eki 2026: 100 USDT bakiyede 20 USDT)
   maxAcik: 1,           // bot 1 aynı anda en fazla 1 işlem
   emirOmruDk: 60,       // dolmayan limit emir 60 dakika sonra iptal
-  kalMin: 5, kalMax: 10
+  kalMin: 5, kalMax: 10,
+  shortKapali: true     // Burak Bey, 4 Kas 2026: short işlem açılmaz (yalnız long)
 };
 
 function botProp() { return PropertiesService.getScriptProperties(); }
@@ -148,6 +149,7 @@ function botSinyal(c, s) {
   var mod = botModu(); if (mod === 'kapali') return null;
   if (!s || s.veto || (s.sinif !== 'A' && s.sinif !== 'A+')) return null;
   botKayit('Sinyal alındı: ' + c.coin + ' ' + (c.plan && c.plan.yon === 'short' ? 'short' : 'long') + ' ' + s.sinif + ' (mod ' + mod + ')');
+  if (BOT.shortKapali && c.plan && c.plan.yon === 'short') return botNot(mod, c.coin + ' short atlandı: short işlem kapalı (yalnız long)');
   var lock = LockService.getScriptLock(); if (!lock.tryLock(20000)) return null;
   try {
     var v = botVarlik(), gz = botGunlukZararAsildi(v.ozkaynak);

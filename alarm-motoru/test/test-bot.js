@@ -108,6 +108,11 @@ t('günlük zarar okunamazsa güvenli taraf: emir yok, hata bildirilir', functio
   ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: LONG }, { sinif: 'A' });
   assert(!istekler.some(function (x) { return /order\/create/.test(x.url); })); assert(/Hata/.test(mesajlar[0]));
 });
+t('short kapalı: short sinyal emir açmaz, long etkilenmez', function () {
+  props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's'; hesap(100);
+  ctx.botSinyal({ coin: 'SOL', fiyat: 100, plan: { yon: 'short', giris: [100, 101], stop: 104, tp1: 94 } }, { sinif: 'A+' });
+  assert(!istekler.some(function (x) { return /order\/create/.test(x.url); })); assert(/short işlem kapalı/.test(mesajlar[0]));
+});
 t('tek yön: ters pozisyon açıkken emir yok (elle açılan dahil)', function () {
   props.BOT_MODU = 'acik'; props.MEXC_API_KEY = 'k'; props.MEXC_API_SECRET = 's'; hesap(100);
   cevap['/api/v1/private/position/open_positions'] = ok([{ symbol: 'ETH_USDT', positionType: 2, holdVol: 1 }]);
