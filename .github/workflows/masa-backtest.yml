@@ -1,0 +1,38 @@
+# Trader Masası ajanlarının geriye dönük testi (test/masa-backtest.js). MEXC açık verisi; anahtar yok, emir yok.
+# Elle ya da bu dosya / script değişince çalışır. Sonuç iş kaydında ve "masa-backtest" çıktı dosyasında.
+name: masa-backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      gun:
+        description: 'Kaç gün geriye'
+        default: '300'
+  push:
+    paths:
+      - 'test/masa-backtest.js'
+      - 'trader-masasi/ajanlar.js'
+      - '.github/workflows/masa-backtest.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Testler
+        run: node test/masa.test.js
+      - name: Backtest
+        run: node test/masa-backtest.js "${{ github.event.inputs.gun || '300' }}" 40 "$RUNNER_TEMP/masa-backtest.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: masa-backtest
+          path: ${{ runner.temp }}/masa-backtest.json
