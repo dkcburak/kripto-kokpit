@@ -104,6 +104,8 @@ async function izle(getJson, onceki, simdi) {
   } catch (e) { hatalar.push('dKc: ' + String(e.message || e).slice(0, 50)); }
   // Gözlem: Trend/Funding/Güç ilk 28 gün kağıt karne (havuza sayılmaz)
   var gozlem = {}; ['trend', 'funding', 'guc'].forEach(function (a) { gozlem[a] = simdi - (durum.baslangic || simdi) < GOZLEM_GUN * 86400000; });
+  // Geriye dönük test (5 Kas 2026, 300 gün): Funding TRAIN eksi -> elendi (süresiz gözlem, havuza girmez); Trend 5 işlem -> yetersiz veri, gözlem sürer
+  var ELENDI = { funding: 'geriye dönük testte avantaj yok (TRAIN -5R)' }; Object.keys(ELENDI).forEach(function (a) { gozlem[a] = true; });
   Object.keys(durum.gorulen).forEach(function (id) { if (simdi - durum.gorulen[id] > 3 * 86400000) delete durum.gorulen[id]; });
   // Profesör
   var kr = {}; Object.keys(TRADER).forEach(function (a) { kr[a] = karne(durum.kapali, a).son30; });
@@ -127,7 +129,7 @@ async function izle(getJson, onceki, simdi) {
   var ajanlar = {};
   Object.keys(TRADER).forEach(function (a) {
     var ac = durum.acik.filter(function (x) { return x.trader === a && !x.sanal; });
-    ajanlar[a] = { tf: TRADER[a].tf, karne: karne(durum.kapali, a), gozlem: !!gozlem[a], acik: ac.map(function (x) { return { coin: x.coin, giris: x.giris || null, stop: x.stop, tp1: x.tp1, r: x.giris ? y((fiyat[x.coin] - x.giris) / (x.giris - x.stop0)) : null }; }), durum: ac.length ? 'pozisyonda' : 'tariyor' };
+    ajanlar[a] = { tf: TRADER[a].tf, karne: karne(durum.kapali, a), gozlem: !!gozlem[a], elendi: ELENDI[a] || null, acik: ac.map(function (x) { return { coin: x.coin, giris: x.giris || null, stop: x.stop, tp1: x.tp1, r: x.giris ? y((fiyat[x.coin] - x.giris) / (x.giris - x.stop0)) : null }; }), durum: ac.length ? 'pozisyonda' : 'tariyor' };
   });
   var onayli = durum.acik.filter(function (x) { return !x.sanal; }).sort(function (a, b) { return b.zaman - a.zaman; }).map(function (x) {
     var m = x.trader === 'trend' ? V[x.coin].d1 : x.trader === 'funding' ? V[x.coin].h1 : V[x.coin].h4;

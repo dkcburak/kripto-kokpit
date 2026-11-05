@@ -108,8 +108,8 @@ function ajanBilgi(a) {
   var aj = D && D.ozet && D.ozet.ajanlar && D.ozet.ajanlar[a];
   if (!aj) return { ad: AD[a], st: 'veri yok', ks: '—', r: '—', poz: false, alt: ACIKLAMA[a] };
   var k = aj.karne.son30, poz = aj.acik.length > 0, st = poz ? 'Pozisyonda · ' + aj.acik.map(function (x) { return x.coin; }).join(',') : 'Tarıyor · ' + aj.tf;
-  var r = k.n >= 5 ? fr(k.toplamR) : poz ? 'açık' : aj.gozlem ? 'gözlem' : k.n ? fr(k.toplamR) : '—';
-  return { ad: AD[a], st: st, ks: poz ? aj.acik[0].coin : aj.tf, r: r, n: k.n + ' işlem' + (aj.gozlem ? ' · gözlem' : ''), poz: poz, gozlem: aj.gozlem, alt: ACIKLAMA[a] + ' · son 30: ' + k.n + ' işlem, ' + fr(k.toplamR) + ', isabet %' + k.isabet };
+  var r = aj.elendi ? 'elendi' : k.n >= 5 ? fr(k.toplamR) : poz ? 'açık' : aj.gozlem ? 'gözlem' : k.n ? fr(k.toplamR) : '—';
+  return { ad: AD[a], st: st, ks: poz ? aj.acik[0].coin : aj.tf, r: r, n: k.n + ' işlem' + (aj.gozlem ? ' · gözlem' : ''), poz: poz, gozlem: aj.gozlem, alt: (aj.elendi ? 'ELENDİ: ' + aj.elendi + ' · ' : '') + ACIKLAMA[a] + ' · son 30: ' + k.n + ' işlem, ' + fr(k.toplamR) + ', isabet %' + k.isabet };
 }
 
 /* ---------- Masa ---------- */
@@ -159,7 +159,7 @@ function ajanBilgi(a) {
       ctx.save(); ctx.globalAlpha = .35 + ph * .5; ring(p.x, p.y, nr + 4, col, 1, [1, 4]); ctx.restore();
       var g1 = Math.max(10, Math.round(nr * .3)), g2 = Math.max(10, Math.round(nr * .26)), g3 = Math.max(8, Math.round(nr * .19));
       text(a.ad.toUpperCase(), p.x, p.y - nr * .3, '700 ' + g1 + 'px Oxanium, sans-serif', C.fg);
-      text(a.r, p.x, p.y + nr * .08, '600 ' + g2 + 'px JetBrains Mono, monospace', a.poz ? C.long : a.r === 'gözlem' || a.r === '—' ? C.mute : C.fg);
+      text(a.r, p.x, p.y + nr * .08, '600 ' + g2 + 'px JetBrains Mono, monospace', a.poz ? C.long : a.r === 'gözlem' || a.r === '—' ? C.mute : a.r === 'elendi' ? C.short : C.fg);
       text(nr < 44 ? a.ks : a.st, p.x, p.y + nr * .42, g3 + 'px JetBrains Mono, monospace', a.poz ? C.long : C.mute);
     });
     if (sel >= 0) { var a2 = ajanBilgi(SIRA[sel]), bw = Math.min(W - 24, 300), bh = 64, bx = 12, by = 12; ctx.fillStyle = 'rgba(11,17,28,.94)'; ctx.strokeStyle = C.acc; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill(); ctx.stroke();
