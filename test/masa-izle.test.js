@@ -37,6 +37,19 @@ var testler = [
     assert.strictEqual(s2.kararlar.filter(function (x) { return x.trader === 'kirilim'; }).length, 1);
     assert.strictEqual(s2.acik.length, s1.acik.length);
   }),
+  t('dolum: aralığa değmeyen mum doldurmaz, 12 mum sonra iptal; değen mum üst sınırdan doldurur', async function () {
+    var s1 = await I.izle(sahte(['BTC', 'SOL'], 'SOL'), null, SIMDI);
+    var p = s1.acik.filter(function (x) { return x.coin === 'SOL' && x.trader === 'kirilim'; })[0]; assert(p && !p.dolum, 'ilk çalışmada dolum beklenmez');
+    // sonraki 13 mum aralığın (101-105) üstünde: dolmaz, iptal
+    var yuksek = function (url) { var c = /kline\/([A-Z]+)_USDT\?interval=(\w+)/.exec(url); if (c && c[2] === 'Hour4') { var h = seri(80, 14400, SN + 13 * 14400, 100, 0); for (var i = 66; i < 80; i++) { h[i].open = 110; h[i].high = 112; h[i].low = 108; h[i].close = 111; } return Promise.resolve(paket(h)); } return sahte(['BTC', 'SOL'], 'SOL')(url); };
+    var s2 = await I.izle(yuksek, JSON.parse(JSON.stringify(s1)), SIMDI + 13 * 14400000);
+    var k = s2.kapali.filter(function (x) { return x.coin === 'SOL' && x.neden === 'dolmadı'; }); assert.strictEqual(k.length, 1);
+    assert.strictEqual(I.karne(s2.kapali, 'kirilim').hepsi.n, 0, 'dolmayan işlem karneye girmez');
+    // aralığa değen mum: açılış 106, dip 104 -> dolum 105 (üst sınır)
+    var deger = function (url) { var c = /kline\/([A-Z]+)_USDT\?interval=(\w+)/.exec(url); if (c && c[2] === 'Hour4') { var h = seri(80, 14400, SN + 14400, 100, 0); h[79].open = 106; h[79].high = 107; h[79].low = 104; h[79].close = 106.5; return Promise.resolve(paket(h)); } return sahte(['BTC', 'SOL'], 'SOL')(url); };
+    var s3 = await I.izle(deger, JSON.parse(JSON.stringify(s1)), SIMDI + 14400000);
+    var q = s3.acik.filter(function (x) { return x.coin === 'SOL' && x.trader === 'kirilim'; })[0]; assert(q && Math.abs(q.dolum - 105) < 1e-9, JSON.stringify(q));
+  }),
   t('karne: kapalı işlemlerden son 30 ve tümü', function () {
     var k = I.karne([{ trader: 'a', r: 2 }, { trader: 'a', r: -1 }, { trader: 'b', r: 1 }], 'a');
     assert(k.hepsi.n === 2 && k.hepsi.toplamR === 1 && k.hepsi.isabet === 50, JSON.stringify(k));
