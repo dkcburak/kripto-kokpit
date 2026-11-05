@@ -14,7 +14,7 @@ function kapanmis(d, adim, sn) {
   return d.time.map(function (x, n) { return { time: x, open: +d.open[n], high: +d.high[n], low: +d.low[n], close: +d.close[n], vol: +d.vol[n] }; }).filter(function (m) { return m.time + adim <= sn; });
 }
 function karne(kapali, trader) {
-  var k = kapali.filter(function (x) { return x.trader === trader; }), s30 = k.slice(-30);
+  var k = kapali.filter(function (x) { return x.trader === trader && x.neden !== 'dolmadı' && x.neden !== 'iptal'; }), s30 = k.slice(-30);
   function oz(l) { var t = 0, kz = 0; l.forEach(function (x) { t += x.r; if (x.r > 0) kz++; }); return { n: l.length, toplamR: +t.toFixed(2), isabet: l.length ? Math.round(kz / l.length * 100) : 0 }; }
   return { hepsi: oz(k), son30: oz(s30) };
 }
@@ -32,7 +32,15 @@ function ilerletAcik(durum, coin, trader, mumlar, kapaliEkle) {
     for (var i = 0; i < mumlar.length; i++) {
       var m = mumlar[i];
       if (m.time <= (p.sonKontrol || 0)) continue;
-      if (!p.dolum) { if (m.time < p.t) continue; p.dolum = m.open; p.giris = m.open; p.stop0 = p.stop; p.sonKontrol = m.time; if (p.giris <= p.stop) { kapaliEkle(p, { r: 0, neden: 'iptal' }, m); return false; } continue; }
+      if (!p.dolum) {
+        // Limit giriş: mum giriş aralığının üst sınırına değerse dolar (açılış aralığın altındaysa açılıştan). 12 mum dolmazsa iptal.
+        if (m.time < p.t) continue;
+        p.sonKontrol = m.time; p.bekleme = (p.bekleme || 0) + 1;
+        var ust = Math.max(p.planGiris[0], p.planGiris[1]);
+        if (m.low <= ust) { p.dolum = Math.min(m.open, ust); p.giris = p.dolum; p.stop0 = p.stop; if (p.giris <= p.stop) { kapaliEkle(p, { r: 0, neden: 'iptal' }, m); return false; } continue; }
+        if (p.bekleme >= 12) { kapaliEkle(p, { r: 0, neden: 'dolmadı' }, m); return false; }
+        continue;
+      }
       p.sonKontrol = m.time;
       var s = A.ilerlet(p, m);
       if (s) { kapaliEkle(p, s, m); return false; }
