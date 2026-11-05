@@ -1,0 +1,43 @@
+# Trader Masası KAĞIT izleme: saatte bir 5 trader sinyal arar, Profesör karar verir, kağıt işlemler ilerler.
+# Durum masa-veri dalında masa.json; panel (trader-masasi/index.html) bunu okur. Gerçek emir yok, anahtar yok.
+name: masa-izleme
+
+on:
+  schedule:
+    - cron: '21 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: masa-izleme
+  cancel-in-progress: false
+
+jobs:
+  izle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Testler
+        run: node test/masa.test.js && node test/masa-izle.test.js
+      - name: Önceki durum (varsa)
+        run: |
+          git fetch --depth=1 "https://github.com/${{ github.repository }}.git" masa-veri 2>/dev/null && git show FETCH_HEAD:masa.json > "$RUNNER_TEMP/onceki.json" || echo "önceki durum yok, sıfırdan başlanır"
+      - name: İzle
+        run: node trader-masasi/izle.js "$RUNNER_TEMP/onceki.json" "$RUNNER_TEMP/masa.json"
+      - name: Yayınla (masa-veri dalı, tek commit)
+        run: |
+          cd "$RUNNER_TEMP"
+          rm -rf yayin && mkdir yayin && cd yayin
+          git init -q -b masa-veri
+          cp "$RUNNER_TEMP/masa.json" .
+          git -c user.name="trader-masasi" -c user.email="trader-masasi@users.noreply.github.com" add masa.json
+          git -c user.name="trader-masasi" -c user.email="trader-masasi@users.noreply.github.com" commit -q -m "masa $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" masa-veri

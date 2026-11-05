@@ -8,7 +8,7 @@ var AYAR = {
 var KURAL = {
   sema: 'eksik alan', eski: 'veri 45 dakikadan eski', plan: 'plan geçersiz (stop < giriş < hedef değil)', rr: 'komisyonlu R:R 1,5 altında',
   short: 'short kapalı', ayniCoin: 'aynı coinde açık/bekleyen işlem ya da 24 saat içinde stop', havuz: 'havuz dolu (2 işlem / %3 risk)',
-  gunluk: 'günlük zarar sınırı dolu', lik: 'likidasyon stopun 2 katından yakın', gozlem: 'trader gözlem modunda (kağıt karne)'
+  gunluk: 'günlük zarar sınırı dolu', lik: 'likidasyon stopun 2 katından yakın', gozlem: 'trader gözlem modunda'
 };
 function sayi(x) { return typeof x === 'number' && isFinite(x) && x > 0; }
 function planGecerli(p) {
@@ -32,7 +32,6 @@ function karar(s, d) {
   var mid = (s.giris[0] + s.giris[1]) / 2, stopMes = Math.abs(mid - s.stop) / mid;
   // 5x kaldıraçta likidasyon ~%20 uzakta; stop %10'dan uzaksa "likidasyon ≥ 2× stop" şartı tutmaz
   if (stopMes > 0.1) return ret('lik', k);
-  if (d.gozlem && d.gozlem[s.trader]) return ret('gozlem', k, true);
   // Yumuşak puan
   var puan = 100, n = [];
   if (d.btcYon === 'asagi') { puan -= 30; n.push('BTC 1G aşağı (-30)'); }
@@ -47,7 +46,9 @@ function karar(s, d) {
   if (d.hacimDusuk && d.hacimDusuk[s.coin]) { puan -= 10; n.push('hacim ortalamanın altında (-10)'); }
   var kararStr = puan >= AYAR.bekleEsik ? 'onay' : puan >= AYAR.retEsik ? 'bekle' : 'ret';
   var neden = kararStr === 'onay' ? 'Kurallar tamam, puan ' + puan + (n.length ? ' (' + n.join('; ') + ')' : '') + '. Onay.' : 'Puan ' + puan + ': ' + n.join('; ') + '. ' + (kararStr === 'bekle' ? 'Bekle.' : 'Ret.');
-  return { karar: kararStr, puan: puan, neden: neden, kural: n };
+  // Gözlem modundaki trader: karar aynı kuralla verilir, işlem yalnız kağıt karneye yazılır (havuza sayılmaz)
+  var gz = !!(d.gozlem && d.gozlem[s.trader]);
+  return { karar: kararStr, puan: puan, neden: neden + (gz ? ' (gözlem: kağıt karne)' : ''), kural: n, kagit: gz };
 }
 function ret(kod, k, kagit) { return { karar: 'ret', puan: 0, neden: KURAL[kod] + '.', kural: [kod], kagit: !!kagit }; }
 module.exports = { AYAR: AYAR, KURAL: KURAL, karar: karar, planGecerli: planGecerli };

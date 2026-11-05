@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05080f">
+<title>Trader Masası</title>
+<link rel="icon" href="../ikon.svg">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Trader Masası: 5 trader bir dairede, ortada Profesör; sağda onaylı işlem ve karar günlüğü. Veri: masa-veri dalı masa.json (saatlik, kağıt mod). */
+:root{--bg:#05080f;--panel:#0b111c;--line:#172238;--fg:#dbe6f5;--mute:#6c7f9c;--acc:#4fd1ff;--long:#2ee6a6;--short:#ff5a7a;--wait:#ffb547;--display:"Oxanium",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:13px;line-height:1.45;padding-block:max(14px,env(safe-area-inset-top,0px)) max(32px,env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background-image:radial-gradient(ellipse at 30% 0%,#0e1b30 0,transparent 55%)}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:16px}
+header{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 16px}
+h1{font:700 22px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;margin:0}
+h1 span{color:var(--acc)}
+.sys{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.sys b{color:var(--fg);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--long);box-shadow:0 0 8px var(--long);margin-right:6px;vertical-align:middle}
+.dot.kirmizi{background:var(--short);box-shadow:0 0 8px var(--short)}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+.orbit{position:relative;aspect-ratio:1;max-width:100%;border-radius:12px;background:radial-gradient(circle at 50% 50%,#0d1626 0,#070c16 60%,var(--bg) 100%);border:1px solid var(--line);overflow:hidden}
+.orbit canvas{width:100%;height:100%;display:block;cursor:pointer}
+.orbit .leg{position:absolute;left:12px;bottom:10px;display:flex;gap:12px;color:var(--mute);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.orbit .tip{position:absolute;top:10px;right:12px;color:var(--mute);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.side{display:grid;gap:14px;min-width:0}
+h2{font:700 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+h2 small{font:400 10px var(--mono);letter-spacing:0;text-transform:none}
+.tcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:10px;min-width:0}
+.coin{font:700 26px/1 var(--display);letter-spacing:.04em;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{font:700 10px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;padding:5px 8px;border-radius:3px;border:1px solid;white-space:nowrap}
+.onay{color:var(--long);border-color:var(--long);background:rgba(46,230,166,.08)}
+.ret{color:var(--short);border-color:var(--short);background:rgba(255,90,122,.08)}
+.bekle{color:var(--wait);border-color:var(--wait);background:rgba(255,181,71,.08)}
+.gri{color:var(--mute);border-color:var(--line)}
+.lv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-variant-numeric:tabular-nums}
+.lv div{background:rgba(255,255,255,.025);border-radius:6px;padding:8px 10px;min-width:0}
+.lv span{display:block;color:var(--mute);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.lv b{font-weight:600;font-size:15px;white-space:nowrap}
+.lv b.s{color:var(--short)} .lv b.g{color:var(--acc)} .lv b.tp{color:var(--long)}
+.meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);font-size:11px}
+.meta b{color:var(--fg);font-weight:600}
+.why{font-size:12px;border-left:2px solid var(--acc);padding-left:10px}
+.chart{min-width:0}
+.chart canvas{width:100%;height:300px;display:block}
+.chart .cap{display:flex;justify-content:space-between;color:var(--mute);font-size:10px;padding:0 2px 6px;letter-spacing:.08em;text-transform:uppercase}
+.sekme{display:flex;gap:6px;flex-wrap:wrap}
+.sekme button{font:600 11px var(--mono);background:transparent;color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:5px 9px;cursor:pointer}
+.sekme button.aktif{color:var(--acc);border-color:var(--acc)}
+.sekme button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.feed{display:grid;gap:5px}
+.sig{display:grid;grid-template-columns:48px 76px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-width:0}
+.sig .t{color:var(--mute);font-size:11px}
+.sig .who{font:700 12px var(--display);letter-spacing:.04em}
+.sig .what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sig .what i{font-style:normal;color:var(--mute)}
+.sig.pick{border-color:var(--long)}
+.bos{color:var(--mute);text-align:center;padding:28px 12px;background:var(--panel);border:1px dashed var(--line);border-radius:8px}
+.note{color:var(--mute);font-size:11px;text-align:center}
+.note a{color:var(--acc)}
+@media (max-width:860px){.grid{grid-template-columns:1fr}.lv{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.sig{grid-template-columns:1fr auto;grid-template-areas:"who pill" "what what" "t t"}.sig .who{grid-area:who}.sig .pill{grid-area:pill}.sig .what{grid-area:what;white-space:normal}.sig .t{grid-area:t}.chart canvas{height:240px}}
+@media (prefers-reduced-motion:reduce){.dot{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Trader <span>Masası</span></h1>
+  <div class="sys" id="sys"><span><i class="dot"></i>Kağıt mod</span><span id="sysYuk">Veri yükleniyor…</span></div>
+</header>
+<div class="grid">
+  <div class="orbit">
+    <canvas id="o" aria-label="Trader masası: 5 trader ve Profesör"></canvas>
+    <div class="tip">Ajana dokun</div>
+    <div class="leg"><span><i style="background:var(--acc)"></i>Sinyal</span><span><i style="background:var(--long)"></i>Onay</span><span><i style="background:var(--short)"></i>Ret</span><span><i style="background:var(--wait)"></i>Bekle</span></div>
+  </div>
+  <div class="side">
+    <section><h2>Onaylı işlem <small id="onayliSay"></small></h2><div id="onayli"><div class="bos">Veri bekleniyor…</div></div></section>
+    <section><h2>Profesör kararları <small id="kararSay"></small></h2><div class="feed" id="feed"></div></section>
+  </div>
+</div>
+<p class="note" id="not">Kağıt mod: hiçbir işlem gerçek değildir. Saatte bir yenilenir.</p>
+</div>
+
+<script>
+'use strict';
+var VERI = new URLSearchParams(location.search).get('veri') || 'https://raw.githubusercontent.com/dkcburak/kripto-kokpit/masa-veri/masa.json';
+var C = { acc: '#4fd1ff', long: '#2ee6a6', short: '#ff5a7a', wait: '#ffb547', mute: '#6c7f9c', fg: '#dbe6f5', line: '#172238' };
+var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+var AD = { dkc: 'dKc', kirilim: 'Kırılım', trend: 'Trend', funding: 'Funding', guc: 'Güç' };
+var ACIKLAMA = { dkc: 'EMA+RSI yön filtresi, 1S onay, hedef 2R (kokpit kuralları)', kirilim: '4S: 20 mum zirvesi + hacim ≥2,5x, stop 2 ATR, hedef 2R', trend: '1G: 55 gün zirvesi, EMA50>EMA200, 3 ATR takip stop', funding: '1S: funding ≤ -%0,03 + 4S EMA20 altı dönüş mumu, hedef 2R', guc: 'BTC\'yi yenen lider coinde 4S EMA20 geri çekilmesi, hedef 2R' };
+var SIRA = ['dkc', 'kirilim', 'trend', 'funding', 'guc'];
+var D = null, sel = -1, onayliSec = 0;
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function f(x) { if (x == null || !isFinite(x)) return '—'; var a = Math.abs(x); return x.toLocaleString('tr-TR', { minimumFractionDigits: a >= 100 ? 2 : a >= 1 ? 3 : 5, maximumFractionDigits: a >= 100 ? 2 : a >= 1 ? 3 : 5 }); }
+function fr(x) { return (x > 0 ? '+' : '') + Number(x).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + ' R'; }
+function saat(ms) { return new Date(ms).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' }); }
+function gunSaat(ms) { var d = new Date(ms); return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' }) + ' ' + saat(ms); }
+function kararPill(k) { return '<span class="pill ' + k + '">' + (k === 'onay' ? 'Onay' : k === 'ret' ? 'Ret' : 'Bekle') + '</span>'; }
+
+function ajanBilgi(a) {
+  var aj = D && D.ozet && D.ozet.ajanlar && D.ozet.ajanlar[a];
+  if (!aj) return { ad: AD[a], st: 'veri yok', ks: '—', r: '—', poz: false, alt: ACIKLAMA[a] };
+  var k = aj.karne.son30, poz = aj.acik.length > 0, st = poz ? 'Pozisyonda · ' + aj.acik.map(function (x) { return x.coin; }).join(',') : 'Tarıyor · ' + aj.tf;
+  var r = k.n >= 5 ? fr(k.toplamR) : poz ? 'açık' : aj.gozlem ? 'gözlem' : k.n ? fr(k.toplamR) : '—';
+  return { ad: AD[a], st: st, ks: poz ? aj.acik[0].coin : aj.tf, r: r, n: k.n + ' işlem' + (aj.gozlem ? ' · gözlem' : ''), poz: poz, gozlem: aj.gozlem, alt: ACIKLAMA[a] + ' · son 30: ' + k.n + ' işlem, ' + fr(k.toplamR) + ', isabet %' + k.isabet };
+}
+
+/* ---------- Masa ---------- */
+(function () {
+  var cv = $('o'), ctx = cv.getContext('2d'), pk = [], t0 = performance.now(), W, H, cx, cy, R, nr, dpr, si = 0;
+  function size() { dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); cx = W / 2; cy = H / 2; R = Math.min(W, H) * 0.345; nr = Math.max(36, Math.min(W, H) * 0.082); }
+  function pos(i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }; }
+  // Gerçek kararlar sırayla canlandırılır: trader -> Profesör (mavi), Profesör -> trader (karar rengi). Karar yoksa tarama nabzı.
+  function emit() {
+    var k = D && D.kararlar && D.kararlar.length ? D.kararlar.slice(-8) : null;
+    if (!k) { pk.push({ i: si++ % 5, dir: 1, t: performance.now(), col: C.acc, d: 1400, then: null }); return; }
+    var e = k[si++ % k.length], i = SIRA.indexOf(e.trader); if (i < 0) return;
+    pk.push({ i: i, dir: 1, t: performance.now(), col: C.acc, d: 1400, then: e.karar });
+  }
+  function ring(x, y, r, col, w, dash, rot) { ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0); ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.strokeStyle = col; ctx.lineWidth = w; if (dash) ctx.setLineDash(dash); ctx.stroke(); ctx.restore(); }
+  function text(s, x, y, fo, col, al) { ctx.font = fo; ctx.fillStyle = col; ctx.textAlign = al || 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y); }
+  function draw(now) {
+    var t = (now - t0) / 1000; ctx.clearRect(0, 0, W, H);
+    if (!RM) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.5); var g = ctx.createConicGradient(0, 0, 0); g.addColorStop(0, 'rgba(79,209,255,0)'); g.addColorStop(.85, 'rgba(79,209,255,0)'); g.addColorStop(1, 'rgba(79,209,255,.10)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R + nr * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    ring(cx, cy, R, C.line, 1); ring(cx, cy, R + nr * 1.5, 'rgba(23,34,56,.6)', 1, [2, 8]);
+    for (var i = 0; i < 5; i++) { var p = pos(i); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.strokeStyle = sel === i ? 'rgba(79,209,255,.5)' : 'rgba(79,209,255,.14)'; ctx.lineWidth = 1; ctx.stroke(); }
+    var alive = [];
+    pk.forEach(function (q) {
+      var k = (now - q.t) / q.d;
+      if (k >= 1) { if (q.dir === 1 && q.then) pk.push({ i: q.i, dir: -1, t: now + 350, col: q.then === 'onay' ? C.long : q.then === 'ret' ? C.short : C.wait, d: 1400 }); return; }
+      alive.push(q); if (k < 0) return;
+      var p = pos(q.i), a = q.dir === 1 ? p : { x: cx, y: cy }, b = q.dir === 1 ? { x: cx, y: cy } : p, e = k < .5 ? 2 * k * k : -1 + (4 - 2 * k) * k, x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e;
+      ctx.save(); ctx.shadowColor = q.col; ctx.shadowBlur = 14; ctx.fillStyle = q.col; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = q.col; ctx.globalAlpha = .35; ctx.lineWidth = 2; ctx.beginPath(); var tx = a.x + (b.x - a.x) * Math.max(0, e - .12), ty = a.y + (b.y - a.y) * Math.max(0, e - .12); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke(); ctx.globalAlpha = 1;
+    });
+    pk = alive;
+    var hr = nr * 1.3, pulse = RM ? 0 : (Math.sin(t * 2) + 1) / 2, pr = D && D.ozet && D.ozet.profesor;
+    ctx.save(); ctx.shadowColor = C.acc; ctx.shadowBlur = 18 + pulse * 14; ctx.fillStyle = '#0a1422'; ctx.beginPath(); ctx.arc(cx, cy, hr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ring(cx, cy, hr, C.acc, 1.5); ring(cx, cy, hr + 7, 'rgba(79,209,255,.45)', 1, [6, 5], RM ? 0 : t * .6); ring(cx, cy, hr + 14, 'rgba(79,209,255,.2)', 1, [2, 6], RM ? 0 : -t * .35);
+    var f1 = Math.max(11, Math.round(hr * .26)), f2 = Math.max(10, Math.round(hr * .2)), f3 = Math.max(9, Math.round(hr * .17));
+    text('PROFESÖR', cx, cy - hr * .3, '700 ' + f1 + 'px Oxanium, sans-serif', C.fg);
+    ctx.font = '600 ' + f2 + 'px JetBrains Mono, monospace';
+    var items = [[String(pr ? pr.onay || 0 : 0), C.long], [String(pr ? pr.ret || 0 : 0), C.short], [String(pr ? pr.bekle || 0 : 0), C.wait]], tw = 0, gap = f2 * .9;
+    items.forEach(function (it) { tw += ctx.measureText(it[0]).width + gap; }); var xx = cx - tw / 2 + gap / 2;
+    items.forEach(function (it) { ctx.fillStyle = it[1]; ctx.beginPath(); ctx.arc(xx - gap * .35, cy + hr * .05, f2 * .22, 0, Math.PI * 2); ctx.fill(); text(it[0], xx + f2 * .3, cy + hr * .05, '600 ' + f2 + 'px JetBrains Mono, monospace', C.fg, 'left'); xx += ctx.measureText(it[0]).width + gap; });
+    var ri = pr && pr.retIsabet != null ? '%' + pr.retIsabet + (hr < 56 ? ' isabet' : ' ret isabeti') : 'bugün';
+    text(ri, cx, cy + hr * .38, '600 ' + f3 + 'px JetBrains Mono, monospace', C.acc);
+    SIRA.forEach(function (ad, i) {
+      var a = ajanBilgi(ad), p = pos(i), on = sel === i, col = a.poz ? C.long : C.acc, ph = RM ? 0 : (Math.sin(t * 1.6 + i) + 1) / 2;
+      ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = on ? 22 : 8 + ph * 8; ctx.fillStyle = on ? '#0f1c2e' : '#0a1220'; ctx.beginPath(); ctx.arc(p.x, p.y, nr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ring(p.x, p.y, nr, col, on ? 2 : 1.2);
+      ctx.save(); ctx.globalAlpha = .35 + ph * .5; ring(p.x, p.y, nr + 4, col, 1, [1, 4]); ctx.restore();
+      var g1 = Math.max(10, Math.round(nr * .3)), g2 = Math.max(10, Math.round(nr * .26)), g3 = Math.max(8, Math.round(nr * .19));
+      text(a.ad.toUpperCase(), p.x, p.y - nr * .3, '700 ' + g1 + 'px Oxanium, sans-serif', C.fg);
+      text(a.r, p.x, p.y + nr * .08, '600 ' + g2 + 'px JetBrains Mono, monospace', a.poz ? C.long : a.r === 'gözlem' || a.r === '—' ? C.mute : C.fg);
+      text(nr < 44 ? a.ks : a.st, p.x, p.y + nr * .42, g3 + 'px JetBrains Mono, monospace', a.poz ? C.long : C.mute);
+    });
+    if (sel >= 0) { var a2 = ajanBilgi(SIRA[sel]), bw = Math.min(W - 24, 300), bh = 64, bx = 12, by = 12; ctx.fillStyle = 'rgba(11,17,28,.94)'; ctx.strokeStyle = C.acc; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill(); ctx.stroke();
+      text(a2.ad + ' · ' + a2.st, bx + 10, by + 16, '700 12px Oxanium, sans-serif', C.fg, 'left'); ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = C.mute; ctx.textAlign = 'left';
+      var w = a2.alt.split(' '), satir = '', yy = by + 34; w.forEach(function (x) { var d = satir ? satir + ' ' + x : x; if (ctx.measureText(d).width > bw - 20) { ctx.fillText(satir, bx + 10, yy); satir = x; yy += 13; } else satir = d; }); if (yy < by + bh - 4) ctx.fillText(satir, bx + 10, yy); }
+    if (!RM) requestAnimationFrame(draw);
+  }
+  cv.addEventListener('click', function (e) { var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, hit = -1; for (var i = 0; i < 5; i++) { var p = pos(i); if (Math.hypot(x - p.x, y - p.y) <= nr + 6) hit = i; } sel = hit === sel ? -1 : hit; if (RM) draw(performance.now()); });
+  size(); addEventListener('resize', function () { size(); if (RM) draw(performance.now()); });
+  window.masaCiz = function () { if (RM) draw(performance.now()); };
+  if (RM) draw(performance.now()); else { emit(); setInterval(emit, 3200); requestAnimationFrame(draw); }
+})();
+
+/* ---------- Grafik ---------- */
+function grafik(cv, o) {
+  var ctx = cv.getContext('2d'), c = o.mumlar.map(function (m) { return { t: m[0], o: m[1], h: m[2], l: m[3], c: m[4] }; }), n = c.length;
+  var S = o.stop0 || o.stop, T1 = o.tp1, T2 = o.tp2, G1 = o.giris[0], G2 = o.giris[1], tet = -1;
+  c.forEach(function (m, i) { if (m.t === o.tetik) tet = i; });
+  var small = matchMedia('(max-width:480px)').matches;
+  function draw() {
+    var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W) return; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var fs = small ? 10 : 11, pl = small ? 44 : 56, pr = small ? 92 : 112, pt = 12, pb = 24, cw = (W - pl - pr) / (n + 1);
+    var lo = Math.min.apply(null, c.map(function (k) { return k.l; }).concat([S])), hi = Math.max.apply(null, c.map(function (k) { return k.h; }).concat([T2 || T1])), pad = (hi - lo) * .06; lo -= pad; hi += pad;
+    var y = function (v) { return pt + (hi - v) / (hi - lo) * (H - pt - pb); };
+    ctx.clearRect(0, 0, W, H); ctx.font = fs + 'px JetBrains Mono, monospace'; ctx.textBaseline = 'alphabetic';
+    var adim = Math.pow(10, Math.floor(Math.log10((hi - lo) / 5))), st = [1, 2, 5, 10].map(function (k) { return k * adim; }).filter(function (k) { return (hi - lo) / k <= 8; })[0] || adim * 10;
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.textAlign = 'right';
+    for (var g = Math.ceil(lo / st) * st; g < hi; g += st) { ctx.beginPath(); ctx.moveTo(pl, y(g)); ctx.lineTo(W - pr, y(g)); ctx.stroke(); ctx.fillStyle = C.mute; ctx.fillText(f(g), pl - 6, y(g) + 4); }
+    ctx.fillStyle = 'rgba(79,209,255,.12)'; ctx.fillRect(pl, y(G2), W - pl - pr, y(G1) - y(G2));
+    var labs = [], lh = fs + 8;
+    function lvl(v, col, lab, dash) { if (!v) return; ctx.save(); ctx.setLineDash(dash || []); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pl, y(v)); ctx.lineTo(W - pr, y(v)); ctx.stroke(); ctx.restore(); labs.push({ y: y(v), col: col, lab: lab }); }
+    lvl(T2, C.long, 'TP2 ' + f(T2), [3, 5]); lvl(T1, C.long, 'TP1 ' + f(T1), [7, 5]); lvl(G1, C.acc, 'GİRİŞ ' + f(G1)); lvl(S, C.short, 'STOP ' + f(S));
+    if (o.stop && o.stop !== S) lvl(o.stop, C.wait, 'TAKİP ' + f(o.stop), [2, 4]);
+    labs.sort(function (a, b) { return a.y - b.y; }); for (var j = 1; j < labs.length; j++) if (labs[j].y - labs[j - 1].y < lh + 2) labs[j].y = labs[j - 1].y + lh + 2;
+    ctx.textAlign = 'left'; ctx.font = '600 ' + fs + 'px JetBrains Mono, monospace';
+    labs.forEach(function (L) { ctx.fillStyle = L.col; ctx.fillRect(W - pr + 6, L.y - lh / 2, pr - 10, lh); ctx.fillStyle = '#05080f'; ctx.fillText(L.lab, W - pr + 11, L.y + fs * .36); });
+    for (var i = 0; i < n; i++) { var k = c[i], x = pl + i * cw + cw / 2, up = k.c >= k.o, col = up ? C.long : C.short; ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, y(k.h)); ctx.lineTo(x, y(k.l)); ctx.stroke();
+      var bw = Math.max(2, cw * .6), tt = y(Math.max(k.o, k.c)), b = y(Math.min(k.o, k.c)); ctx.fillRect(x - bw / 2, tt, bw, Math.max(1.5, b - tt));
+      if (i === tet) { ctx.strokeStyle = C.acc; ctx.lineWidth = 1.5; ctx.strokeRect(x - bw / 2 - 4, y(k.h) - 5, bw + 8, y(k.l) - y(k.h) + 10); ctx.fillStyle = C.acc; ctx.font = fs + 'px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.fillText('tetik mumu', x + bw / 2 + 4, y(k.l) + fs + 10); ctx.textAlign = 'left'; } }
+    ctx.fillStyle = C.mute; ctx.font = fs + 'px JetBrains Mono, monospace'; ctx.fillText('son ' + n + ' mum · ' + o.tf, pl, H - 7);
+  }
+  draw(); addEventListener('resize', draw);
+}
+
+/* ---------- Ekran ---------- */
+function ciz() {
+  var oz = D.ozet, hv = oz.havuz, es = D.hatalar && D.hatalar.length;
+  $('sys').innerHTML = '<span><i class="dot' + (Date.now() - D.zaman > 3 * 3600000 ? ' kirmizi' : '') + '"></i>Kağıt mod</span><span>Havuz <b>' + hv.acik + ' / ' + hv.maxAcik + '</b></span><span>Açık risk <b>%' + f2(hv.risk) + ' / %' + hv.riskTavan + '</b></span><span>Gün <b>' + fr(hv.gun) + '</b></span><span>BTC 1G <b>' + esc(D.btcYon || '—') + '</b></span><span>' + saat(D.zaman) + '</span>';
+  var on = oz.onayli || [];
+  $('onayliSay').textContent = on.length ? on.length + ' kağıt işlem' : '';
+  if (!on.length) $('onayli').innerHTML = '<div class="bos">Profesör onaylı açık işlem yok.<br><small>Traderlar tarıyor; ilk onay burada görünür.</small></div>';
+  else {
+    onayliSec = Math.min(onayliSec, on.length - 1); var o = on[onayliSec], kr = (D.kararlar || []).filter(function (k) { return k.trader === o.trader && k.coin === o.coin && k.karar === 'onay'; }).pop();
+    var sek = on.length > 1 ? '<div class="sekme">' + on.map(function (x, i) { return '<button type="button" id="sek' + i + '" class="' + (i === onayliSec ? 'aktif' : '') + '" data-i="' + i + '">' + esc(x.coin) + ' · ' + esc(AD[x.trader]) + '</button>'; }).join('') + '</div>' : '';
+    var rNow = o.dolum ? (o.fiyat - o.dolum) / (o.dolum - o.stop0) : null;
+    $('onayli').innerHTML = sek + '<div class="tcard"><div class="coin">' + esc(o.coin) + ' <span class="pill onay">Long</span>' + (o.gozlem ? '<span class="pill gri">Gözlem</span>' : '') + '<span class="meta" style="margin-left:auto">Trader <b>' + esc(AD[o.trader]) + '</b> · ' + esc(o.tf) + '</span></div>' +
+      '<div class="lv"><div><span>Giriş</span><b class="g">' + f(o.giris[0]) + ' – ' + f(o.giris[1]) + '</b></div><div><span>Stop</span><b class="s">' + f(o.stop0) + '</b></div><div><span>TP1</span><b class="tp">' + f(o.tp1) + '</b></div><div><span>TP2</span><b class="tp">' + f(o.tp2) + '</b></div></div>' +
+      '<div class="meta"><span>R:R <b>' + f2(o.rr) + '</b> net</span><span>Durum <b>' + (o.dolum ? 'dolum ' + f(o.dolum) + (rNow != null ? ' · şimdi ' + fr(rNow) : '') : 'girişte bekliyor') + '</b></span><span>Sinyal <b>' + gunSaat(o.zaman) + '</b></span>' + (o.stop !== o.stop0 ? '<span>Takip stop <b>' + f(o.stop) + '</b></span>' : '') + '</div>' +
+      (kr ? '<div class="why">' + esc(kr.gerekce) + '<br>Profesör: ' + esc(kr.neden) + '</div>' : '') +
+      '<div class="chart"><div class="cap"><span>' + esc(o.coin) + '/USDT · ' + esc(o.tf) + '</span><span>Son fiyat ' + f(o.fiyat) + '</span></div><canvas id="c"></canvas></div></div>';
+    on.forEach(function (x, i) { var b = $('sek' + i); if (b) b.onclick = function () { onayliSec = i; ciz(); }; });
+    grafik($('c'), o);
+  }
+  var kk = (D.kararlar || []).slice().reverse().slice(0, 14);
+  $('kararSay').textContent = D.kararlar ? D.kararlar.length + ' karar' : '';
+  $('feed').innerHTML = kk.length ? kk.map(function (k) {
+    var ne = k.karar === 'onay' ? 'R:R ' + f2(k.rr) : k.neden.replace(/\.$/, '');
+    return '<div class="sig' + (k.karar === 'onay' ? ' pick' : '') + '"><span class="t">' + gunSaat(k.zaman) + '</span><span class="who">' + esc(AD[k.trader] || k.trader) + '</span><span class="what">' + esc(k.coin) + ' ' + esc(k.yon) + (k.karar === 'onay' ? ' · giriş ' + f(k.giris[0]) + '–' + f(k.giris[1]) + ' · stop ' + f(k.stop) + ' · TP ' + f(k.tp1) : '') + ' <i>· ' + esc(ne) + '</i></span>' + kararPill(k.karar) + '</div>';
+  }).join('') : '<div class="bos">Henüz karar yok. Traderlar her saat başı yeni kapanan mumlarda sinyal arar.</div>';
+  $('not').innerHTML = 'Kağıt mod: hiçbir işlem gerçek değildir. Saatte bir yenilenir' + (es ? ' · ' + es + ' coin okunamadı' : '') + ' · <a href="../">dKc kokpit</a>';
+  if (window.masaCiz) window.masaCiz();
+}
+function f2(x) { return Number(x).toLocaleString('tr-TR', { maximumFractionDigits: 2 }); }
+function yukle() {
+  fetch(VERI + (VERI.indexOf('?') > 0 ? '&' : '?') + 't=' + Math.floor(Date.now() / 300000), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) { D = j; ciz(); }).catch(function (e) {
+    $('sysYuk').textContent = 'Veri yok';
+    $('onayli').innerHTML = '<div class="bos">Masa verisi henüz yok.<br><small>İlk saatlik tarama (masa-izleme) çalışınca dolar. ' + esc(e.message) + '</small></div>';
+    $('feed').innerHTML = '';
+  });
+}
+yukle(); setInterval(yukle, 10 * 60000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) yukle(); });
+</script>
+</body>
+</html>

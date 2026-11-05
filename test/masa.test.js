@@ -53,7 +53,7 @@ t('profesör: sert kurallar sırayla, yumuşak puan', function () {
   assert.strictEqual(P.karar(s, Object.assign({}, d, { gunSonuc: -25 })).kural[0], 'gunluk');
   assert.strictEqual(P.karar(Object.assign({}, s, { veriZamani: simdi - 3e6 }), d).kural[0], 'eski');
   assert.strictEqual(P.karar(Object.assign({}, s, { stop: 80 }), d).kural[0], 'lik');
-  assert.strictEqual(P.karar(s, Object.assign({}, d, { gozlem: { kirilim: true } })).kagit, true);
+  var g = P.karar(s, Object.assign({}, d, { gozlem: { kirilim: true } })); assert(g.kagit === true && g.karar === 'onay', JSON.stringify(g));
   var b = P.karar(s, Object.assign({}, d, { btcYon: 'asagi' })); assert(b.karar === 'onay' && b.puan === 70, JSON.stringify(b));
   var w = P.karar(s, Object.assign({}, d, { btcYon: 'asagi', acik: [{ coin: 'X', yon: 'long' }] })); assert.strictEqual(w.karar, 'bekle');
   var r = P.karar(s, Object.assign({}, d, { btcYon: 'asagi', acik: [{ coin: 'X', yon: 'long' }], olay: true })); assert.strictEqual(r.karar, 'ret');
