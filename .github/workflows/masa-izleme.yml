@@ -1,10 +1,12 @@
-# Trader Masası KAĞIT izleme: saatte bir 5 trader sinyal arar, Profesör karar verir, kağıt işlemler ilerler.
-# Durum masa-veri dalında masa.json; panel (trader-masasi/index.html) bunu okur. Gerçek emir yok, anahtar yok.
+# Profesör izleme: yarım saatte bir 5 trader sinyal arar, Profesör karar verir, kağıt işlemler ilerler.
+# Mod trader-masasi/ayar.json (ya da repo değişkeni MASA_MODU) ile: kagit (varsayılan) | kuru (hesabı okur, emri yazar, göndermez) | acik (Kırılım+Güç için MEXC'de GERÇEK emir).
+# kuru/acik için Actions secrets: MEXC_API_KEY, MEXC_API_SECRET (yalnız işlem yetkili anahtar, çekim kapalı); isteğe bağlı TELEGRAM_TOKEN.
+# Durum masa-veri dalında masa.json; panel (trader-masasi/index.html) bunu okur.
 name: masa-izleme
 
 on:
   schedule:
-    - cron: '21 * * * *'
+    - cron: '6,36 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,11 +28,17 @@ jobs:
         with:
           node-version: '20'
       - name: Testler
-        run: node test/masa.test.js && node test/masa-izle.test.js
+        run: node test/masa.test.js && node test/masa-izle.test.js && node test/masa-emir.test.js
       - name: Önceki durum (varsa)
         run: |
           git fetch --depth=1 "https://github.com/${{ github.repository }}.git" masa-veri 2>/dev/null && git show FETCH_HEAD:masa.json > "$RUNNER_TEMP/onceki.json" || echo "önceki durum yok, sıfırdan başlanır"
       - name: İzle
+        env:
+          MASA_MODU: ${{ vars.MASA_MODU }}
+          MASA_RISK: ${{ vars.MASA_RISK }}
+          MEXC_API_KEY: ${{ secrets.MEXC_API_KEY }}
+          MEXC_API_SECRET: ${{ secrets.MEXC_API_SECRET }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: node trader-masasi/izle.js "$RUNNER_TEMP/onceki.json" "$RUNNER_TEMP/masa.json"
       - name: Yayınla (masa-veri dalı, tek commit)
         run: |

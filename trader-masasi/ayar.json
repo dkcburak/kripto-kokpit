@@ -1,0 +1,5 @@
+{
+  "mod": "kagit",
+  "risk": 0.25,
+  "not": "mod: kagit | kuru | acik. Repo değişkeni MASA_MODU varsa onu kullanır, yoksa bu dosya. acik = Kırılım ve Güç onaylı işlemleri MEXC'de gerçek emir (MEXC_API_KEY/SECRET secrets gerekir)."
+}
