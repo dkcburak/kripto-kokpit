@@ -37,10 +37,10 @@ function plan(ad, giris, stop, rr1, rr2, gerekce, ek) {
   return p;
 }
 
-// T2 Kırılım: 4S kapanış önceki 20 mum zirvesinin üstünde, hacim ≥ 2,5× ortalama. Stop zirve - 2 ATR14. Hedef 2R/3R. Tutma 12 mum.
+// T2 Kırılım: 4S kapanış önceki 20 mum zirvesinin üstünde, hacim ≥ 3× ortalama (6 Kas geriye dönük test: 2,5× TRAIN +1,3R / 3× TRAIN +11,8R, düşüş -28→-16R). Stop zirve - 2 ATR14. Hedef 2R/3R. Tutma 12 mum.
 function kirilim(h4, k, ayar) {
   ayar = ayar || {};
-  var volK = ayar.volK || 2.5, atrK = ayar.atrK || 2;
+  var volK = ayar.volK || 3, atrK = ayar.atrK || 2;
   if (k < 22) return null;
   var yuk = -Infinity, hv = 0;
   for (var i = k - 20; i < k; i++) { yuk = Math.max(yuk, h4[i].high); hv += h4[i].vol; }

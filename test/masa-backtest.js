@@ -155,7 +155,7 @@ async function calistir() {
   function btcYukariMi(tSn) { var g = tSn - (tSn % SG) - SG; return !!btcE50[g]; } // önceki günlük kapanışla
   var VARYANT = [
     { ad: 'kirilim_vol2', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { volK: 2 }); } },
-    { ad: 'kirilim_vol3', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { volK: 3 }); } },
+    { ad: 'kirilim_vol2.5', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { volK: 2.5 }); } },
     { ad: 'kirilim_btcYukari', mum: 'h4', adim: S4, fn: function (c, h4, k) { return btcYukariMi(h4[k].time) ? A.kirilim(h4, k) : null; } },
     { ad: 'kirilim_atr1.5', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { atrK: 1.5 }); } },
     { ad: 'trend_don20_1G', mum: 'd', adim: SG, fn: function (c, d, k) { return A.trend(d, k, { don: 20 }); } },
