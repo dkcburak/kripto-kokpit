@@ -31,6 +31,9 @@ var KAYNAK = [
 ];
 // Coin özelinde ağır haber (24 saat o coine giriş yok)
 var AGIR = /\b(hack(s|ed|er)?|exploit(s|ed)?|drain(s|ed)?|delist(s|ed|ing)?|halt(s|ed)?|suspend(s|ed)?|lawsuit|sues|sued|charged|indict(s|ed|ment)?|bankrupt(cy)?|insolven(t|cy)|rug ?pull|frozen|freeze[sd]?|outage|depeg(s|ged)?|security breach|stolen|unlocks?)\b/i;
+// Zayıf ağır sözcükler (halt, suspend, freeze, outage) yalnız ağ/işlem bağlamında sayılır: "Solana's Shanghai event halted" ağır değildir
+var AGIR_ZAYIF = /\b(halt(s|ed)?|suspend(s|ed)?|frozen|freeze[sd]?|outage)\b/i, BAGLAM = /\b(network|chain|blockchain|mainnet|trading|withdrawals?|deposits?|bridge|validators?|protocol|exchange|wallet|node|block production)\b/i;
+function agirMi(b) { if (!AGIR.test(b)) return false; var kalan = b.replace(AGIR_ZAYIF, ''); return AGIR.test(kalan) || BAGLAM.test(b); }
 // Piyasa geneli ağır başlık (yoğunluk 6 saatte ≥3 → 4 saat olay)
 var PIYASA = /\b(crash(es|ed)?|plunge[sd]?|liquidations?|bans?|banned|tariffs?|war|sanctions?|sell-?off|rout|black swan|emergency|collapse[sd]?|defaults?)\b/i;
 var ISIM = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', XRP: 'ripple|xrp', BNB: 'binance coin|bnb', DOGE: 'dogecoin', ADA: 'cardano', AVAX: 'avalanche', LINK: 'chainlink', DOT: 'polkadot', TRX: 'tron', TON: 'toncoin', SUI: 'sui', APT: 'aptos', ARB: 'arbitrum', OP: 'optimism', LTC: 'litecoin', BCH: 'bitcoin cash', NEAR: 'near protocol', UNI: 'uniswap', AAVE: 'aave', PEPE: 'pepe', WIF: 'dogwifhat', SHIB: 'shiba', ATOM: 'cosmos', FIL: 'filecoin', INJ: 'injective', TIA: 'celestia', SEI: 'sei network', HYPE: 'hyperliquid', ZEC: 'zcash', XLM: 'stellar', HBAR: 'hedera', ONDO: 'ondo', ENA: 'ethena', TAO: 'bittensor', WLD: 'worldcoin', ZRO: 'layerzero', LIT: 'litentry', FLUID: 'fluid', QNT: 'quant', BEAT: 'beat' };
@@ -68,7 +71,7 @@ function degerlendir(basliklar, coinler, simdi, onceki) {
   Object.keys(coinBayrak).forEach(function (c) { if (coinBayrak[c].bitis <= simdi) delete coinBayrak[c]; });
   basliklar.forEach(function (h) {
     if (h.zaman && simdi - h.zaman > 12 * 3600000) return;
-    var agir = AGIR.test(h.baslik), piy = PIYASA.test(h.baslik), vuran = [];
+    var agir = agirMi(h.baslik), piy = PIYASA.test(h.baslik), vuran = [];
     if (agir) coinler.forEach(function (c) { if (coinGeciyor(c, h.baslik)) { vuran.push(c); if (!coinBayrak[c] || coinBayrak[c].bitis < simdi + 24 * 3600000) coinBayrak[c] = { neden: h.baslik.slice(0, 120), bitis: (h.zaman || simdi) + 24 * 3600000, kaynak: h.kaynak }; } });
     if (piy && (!h.zaman || simdi - h.zaman <= 6 * 3600000)) piyasaSay++;
     if (agir || piy) ilgili.push({ baslik: h.baslik.slice(0, 140), zaman: h.zaman, kaynak: h.kaynak, coin: vuran, link: h.link });
@@ -91,4 +94,4 @@ async function haberci(getText, coinler, onceki, simdi) {
   var olay = tk.aktif ? { neden: tk.aktif.ad, bitis: tk.aktif.bitis, tur: 'takvim' } : dg.piyasa ? { neden: dg.piyasa.neden, bitis: dg.piyasa.bitis, tur: 'haber' } : null;
   return { zaman: simdi, olay: olay, takvim: tk.yakin, coinler: dg.coinler, basliklar: dg.basliklar, kaynaklar: kaynaklar, okunan: hepsi.length, hatalar: hatalar };
 }
-module.exports = { TAKVIM: TAKVIM, KAYNAK: KAYNAK, rssAyristir: rssAyristir, coinGeciyor: coinGeciyor, takvim: takvim, degerlendir: degerlendir, haberci: haberci };
+module.exports = { agirMi: agirMi, TAKVIM: TAKVIM, KAYNAK: KAYNAK, rssAyristir: rssAyristir, coinGeciyor: coinGeciyor, takvim: takvim, degerlendir: degerlendir, haberci: haberci };

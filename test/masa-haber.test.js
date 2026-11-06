@@ -13,6 +13,11 @@ var testler = [
   t('coin eşleşmesi: sembol kelime sınırı, ad; SOL "solution" ile eşleşmez', function () {
     assert(Hb.coinGeciyor('SOL', 'Solana network halted for 2 hours') && Hb.coinGeciyor('SOL', '$SOL drops') && !Hb.coinGeciyor('SOL', 'A solution for DeFi') && !Hb.coinGeciyor('SOL', 'CONSOLIDATION ahead') && Hb.coinGeciyor('XRP', 'Ripple sued by SEC'));
   }),
+  t('ağır haber bağlamı: etkinlik iptali ve KOSPI durdurması ağır değil; ağ durması ve hack ağır', function () {
+    assert(!Hb.agirMi("Solana’s Shanghai event halted over unauthorized promotion: Report"));
+    assert(!Hb.agirMi('Bitcoin holds $75K as AI regulation fears see KOSPI halted after 8% crash'));
+    assert(Hb.agirMi('Solana network halted for 2 hours, validators restart') && Hb.agirMi('Solana DeFi protocol hacked for $40M') && Hb.agirMi('Exchange suspends ZEC withdrawals') && Hb.agirMi('Zcash delisted by exchange'));
+  }),
   t('takvim: CPI penceresi (±2 saat) aktif, 48 saat içindekiler listelenir; seçim -12/+24 saat', function () {
     var tk = Hb.takvim(SIMDI);
     assert(tk.aktif && /CPI/.test(tk.aktif.ad) && tk.aktif.bitis === Date.parse('2026-11-10T15:30:00Z'), JSON.stringify(tk));
