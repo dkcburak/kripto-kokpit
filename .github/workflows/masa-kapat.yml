@@ -1,0 +1,45 @@
+# Profesör ACİL DURDURMA / kilit açma (elle çalıştırılır). durdur: kilit koyar, Profesör'ün bekleyen emirlerini iptal eder,
+# canlı pozisyonlarını piyasa emriyle kapatır (elle açılanlara dokunmaz). ac: kilidi kaldırır. Durum masa-veri dalına yazılır.
+name: masa-kapat
+
+on:
+  workflow_dispatch:
+    inputs:
+      islem:
+        description: 'durdur (acil durdurma) | ac (kilidi kaldır)'
+        required: true
+        default: 'durdur'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: masa-izleme
+  cancel-in-progress: false
+
+jobs:
+  kapat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Mevcut durum
+        run: git fetch --depth=1 "https://github.com/${{ github.repository }}.git" masa-veri && git show FETCH_HEAD:masa.json > "$RUNNER_TEMP/onceki.json"
+      - name: Uygula
+        env:
+          MEXC_API_KEY: ${{ secrets.MEXC_API_KEY }}
+          MEXC_API_SECRET: ${{ secrets.MEXC_API_SECRET }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: node trader-masasi/kapat.js "${{ github.event.inputs.islem }}" "$RUNNER_TEMP/onceki.json" "$RUNNER_TEMP/masa.json" || { echo "::warning::kapat.js hata kodu $?; durum yine yazılıyor"; test -s "$RUNNER_TEMP/masa.json"; }
+      - name: Yayınla (masa-veri dalı)
+        run: |
+          cd "$RUNNER_TEMP" && rm -rf yayin && mkdir yayin && cd yayin
+          git init -q -b masa-veri && cp "$RUNNER_TEMP/masa.json" .
+          git -c user.name="trader-masasi" -c user.email="trader-masasi@users.noreply.github.com" add masa.json
+          git -c user.name="trader-masasi" -c user.email="trader-masasi@users.noreply.github.com" commit -q -m "masa kapat ${{ github.event.inputs.islem }} $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" masa-veri

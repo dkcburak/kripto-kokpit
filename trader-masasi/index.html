@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#05080f">
-<title>Trader Masası</title>
+<title>Profesör</title>
 <link rel="icon" href="../ikon.svg">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Trader Masası: 5 trader bir dairede, ortada Profesör; sağda onaylı işlem ve karar günlüğü. Veri: masa-veri dalı masa.json (saatlik, kağıt mod). */
+/* Profesör: 5 trader bir dairede, ortada Profesör; sağda onaylı işlem ve karar günlüğü. Veri: masa-veri dalı masa.json (yarım saatlik; mod kağıt/kuru/canlı). */
 :root{--bg:#05080f;--panel:#0b111c;--line:#172238;--fg:#dbe6f5;--mute:#6c7f9c;--acc:#4fd1ff;--long:#2ee6a6;--short:#ff5a7a;--wait:#ffb547;--display:"Oxanium",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -70,12 +70,12 @@ h2 small{font:400 10px var(--mono);letter-spacing:0;text-transform:none}
 <body>
 <div class="wrap">
 <header>
-  <h1>Trader <span>Masası</span></h1>
-  <div class="sys" id="sys"><span><i class="dot"></i>Kağıt mod</span><span id="sysYuk">Veri yükleniyor…</span></div>
+  <h1>Profes<span>ör</span></h1>
+  <div class="sys" id="sys"><span><i class="dot"></i>Yükleniyor</span><span id="sysYuk">Veri yükleniyor…</span></div>
 </header>
 <div class="grid">
   <div class="orbit">
-    <canvas id="o" aria-label="Trader masası: 5 trader ve Profesör"></canvas>
+    <canvas id="o" aria-label="Profesör: 5 trader ve ortada Profesör"></canvas>
     <div class="tip">Ajana dokun</div>
     <div class="leg"><span><i style="background:var(--acc)"></i>Sinyal</span><span><i style="background:var(--long)"></i>Onay</span><span><i style="background:var(--short)"></i>Ret</span><span><i style="background:var(--wait)"></i>Bekle</span></div>
   </div>
@@ -84,7 +84,7 @@ h2 small{font:400 10px var(--mono);letter-spacing:0;text-transform:none}
     <section><h2>Profesör kararları <small id="kararSay"></small></h2><div class="feed" id="feed"></div></section>
   </div>
 </div>
-<p class="note" id="not">Kağıt mod: hiçbir işlem gerçek değildir. Saatte bir yenilenir.</p>
+<p class="note" id="not">Kağıt mod: hiçbir işlem gerçek değildir. Yarım saatte bir yenilenir.</p>
 </div>
 
 <script>
@@ -109,7 +109,8 @@ function ajanBilgi(a) {
   if (!aj) return { ad: AD[a], st: 'veri yok', ks: '—', r: '—', poz: false, alt: ACIKLAMA[a] };
   var k = aj.karne.son30, poz = aj.acik.length > 0, st = poz ? 'Pozisyonda · ' + aj.acik.map(function (x) { return x.coin; }).join(',') : 'Tarıyor · ' + aj.tf;
   var r = aj.elendi ? 'elendi' : k.n >= 5 ? fr(k.toplamR) : poz ? 'açık' : aj.gozlem ? 'gözlem' : k.n ? fr(k.toplamR) : '—';
-  return { ad: AD[a], st: st, ks: poz ? aj.acik[0].coin : aj.tf, r: r, n: k.n + ' işlem' + (aj.gozlem ? ' · gözlem' : ''), poz: poz, gozlem: aj.gozlem, alt: (aj.elendi ? 'ELENDİ: ' + aj.elendi + ' · ' : '') + ACIKLAMA[a] + ' · son 30: ' + k.n + ' işlem, ' + fr(k.toplamR) + ', isabet %' + k.isabet };
+  var canliEt = aj.canli && D.mod === 'acik' ? ' · CANLI' : '';
+  return { ad: AD[a], st: st, ks: poz ? aj.acik[0].coin : aj.tf, r: r, n: k.n + ' işlem' + (aj.gozlem ? ' · gözlem' : '') + canliEt, poz: poz, gozlem: aj.gozlem, alt: (aj.elendi ? 'ELENDİ: ' + aj.elendi + ' · ' : '') + ACIKLAMA[a] + ' · son 30: ' + k.n + ' işlem, ' + fr(k.toplamR) + ', isabet %' + k.isabet };
 }
 
 /* ---------- Masa ---------- */
@@ -208,15 +209,16 @@ function grafik(cv, o) {
 /* ---------- Ekran ---------- */
 function ciz() {
   var oz = D.ozet, hv = oz.havuz, es = D.hatalar && D.hatalar.length;
-  $('sys').innerHTML = '<span><i class="dot' + (Date.now() - D.zaman > 3 * 3600000 ? ' kirmizi' : '') + '"></i>Kağıt mod</span><span>Havuz <b>' + hv.acik + ' / ' + hv.maxAcik + '</b></span><span>Açık risk <b>%' + f2(hv.risk) + ' / %' + hv.riskTavan + '</b></span><span>Gün <b>' + fr(hv.gun) + '</b></span><span>BTC 1G <b>' + esc(D.btcYon || '—') + '</b></span><span>' + saat(D.zaman) + '</span>';
+  var MODAD = { kagit: 'Kağıt mod', kuru: 'Kuru prova', acik: 'CANLI' }, mod = D.mod || 'kagit', bs = D.borsa;
+  $('sys').innerHTML = '<span><i class="dot' + (Date.now() - D.zaman > 3 * 3600000 ? ' kirmizi' : '') + '"></i>' + (D.kilit ? 'DURDURULDU' : MODAD[mod] || mod) + '</span>' + (bs ? '<span>Hesap <b>' + f2(bs.ozkaynak) + ' USDT</b></span><span>Borsa <b>' + bs.pozisyonlar.length + ' poz · ' + bs.emirler.length + ' emir</b></span>' : '') + '<span>Havuz <b>' + hv.acik + ' / ' + hv.maxAcik + '</b></span><span>Açık risk <b>%' + f2(hv.risk) + ' / %' + hv.riskTavan + '</b></span><span>Gün <b>' + fr(hv.gun) + '</b></span><span>BTC 1G <b>' + esc(D.btcYon || '—') + '</b></span><span>' + saat(D.zaman) + '</span>';
   var on = oz.onayli || [];
-  $('onayliSay').textContent = on.length ? on.length + ' kağıt işlem' : '';
+  $('onayliSay').textContent = on.length ? on.filter(function (x) { return x.canli; }).length + ' canlı · ' + on.filter(function (x) { return !x.canli; }).length + ' kağıt' : '';
   if (!on.length) $('onayli').innerHTML = '<div class="bos">Profesör onaylı açık işlem yok.<br><small>Traderlar tarıyor; ilk onay burada görünür.</small></div>';
   else {
     onayliSec = Math.min(onayliSec, on.length - 1); var o = on[onayliSec], kr = (D.kararlar || []).filter(function (k) { return k.trader === o.trader && k.coin === o.coin && k.karar === 'onay'; }).pop();
     var sek = on.length > 1 ? '<div class="sekme">' + on.map(function (x, i) { return '<button type="button" id="sek' + i + '" class="' + (i === onayliSec ? 'aktif' : '') + '" data-i="' + i + '">' + esc(x.coin) + ' · ' + esc(AD[x.trader]) + '</button>'; }).join('') + '</div>' : '';
     var rNow = o.dolum ? (o.fiyat - o.dolum) / (o.dolum - o.stop0) : null;
-    $('onayli').innerHTML = sek + '<div class="tcard"><div class="coin">' + esc(o.coin) + ' <span class="pill onay">Long</span>' + (o.gozlem ? '<span class="pill gri">Gözlem</span>' : '') + '<span class="meta" style="margin-left:auto">Trader <b>' + esc(AD[o.trader]) + '</b> · ' + esc(o.tf) + '</span></div>' +
+    $('onayli').innerHTML = sek + '<div class="tcard"><div class="coin">' + esc(o.coin) + ' <span class="pill onay">Long</span>' + (o.canli ? '<span class="pill" style="background:var(--short);color:#fff">CANLI' + (o.vol ? ' · ' + o.vol + ' kontrat ' + (o.kal ? o.kal + 'x' : '') : '') + '</span>' : '<span class="pill gri">Kağıt</span>') + (o.gozlem ? '<span class="pill gri">Gözlem</span>' : '') + (o.not ? '<span class="pill gri" title="' + esc(o.not) + '">emir yok</span>' : '') + '<span class="meta" style="margin-left:auto">Trader <b>' + esc(AD[o.trader]) + '</b> · ' + esc(o.tf) + '</span></div>' +
       '<div class="lv"><div><span>Giriş</span><b class="g">' + f(o.giris[0]) + ' – ' + f(o.giris[1]) + '</b></div><div><span>Stop</span><b class="s">' + f(o.stop0) + '</b></div><div><span>TP1</span><b class="tp">' + f(o.tp1) + '</b></div><div><span>TP2</span><b class="tp">' + f(o.tp2) + '</b></div></div>' +
       '<div class="meta"><span>R:R <b>' + f2(o.rr) + '</b> net</span><span>Durum <b>' + (o.dolum ? 'dolum ' + f(o.dolum) + (rNow != null ? ' · şimdi ' + fr(rNow) : '') : 'girişte bekliyor') + '</b></span><span>Sinyal <b>' + gunSaat(o.zaman) + '</b></span>' + (o.stop !== o.stop0 ? '<span>Takip stop <b>' + f(o.stop) + '</b></span>' : '') + '</div>' +
       (kr ? '<div class="why">' + esc(kr.gerekce) + '<br>Profesör: ' + esc(kr.neden) + '</div>' : '') +
@@ -230,7 +232,7 @@ function ciz() {
     var ne = k.karar === 'onay' ? 'R:R ' + f2(k.rr) : k.neden.replace(/\.$/, '');
     return '<div class="sig' + (k.karar === 'onay' ? ' pick' : '') + '"><span class="t">' + gunSaat(k.zaman) + '</span><span class="who">' + esc(AD[k.trader] || k.trader) + '</span><span class="what">' + esc(k.coin) + ' ' + esc(k.yon) + (k.karar === 'onay' ? ' · giriş ' + f(k.giris[0]) + '–' + f(k.giris[1]) + ' · stop ' + f(k.stop) + ' · TP ' + f(k.tp1) : '') + ' <i>· ' + esc(ne) + '</i></span>' + kararPill(k.karar) + '</div>';
   }).join('') : '<div class="bos">Henüz karar yok. Traderlar her saat başı yeni kapanan mumlarda sinyal arar.</div>';
-  $('not').innerHTML = 'Kağıt mod: hiçbir işlem gerçek değildir. Saatte bir yenilenir' + (es ? ' · ' + es + ' coin okunamadı' : '') + ' · <a href="../">dKc kokpit</a>';
+  $('not').innerHTML = (mod === 'acik' ? 'CANLI: Kırılım ve Güç onaylı işlemleri MEXC\'de gerçek emirdir; dKc, Trend, Funding kağıtta. ' : mod === 'kuru' ? 'Kuru prova: hesap okunur, emir yazılır ama gönderilmez. ' : 'Kağıt mod: hiçbir işlem gerçek değildir. ') + 'Yarım saatte bir yenilenir' + (es ? ' · ' + es + ' uyarı' : '') + ' · <a href="../">dKc kokpit</a>';
   if (window.masaCiz) window.masaCiz();
 }
 function f2(x) { return Number(x).toLocaleString('tr-TR', { maximumFractionDigits: 2 }); }
