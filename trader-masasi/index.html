@@ -94,7 +94,7 @@ var VERI = new URLSearchParams(location.search).get('veri') || 'https://raw.gith
 var C = { acc: '#4fd1ff', long: '#2ee6a6', short: '#ff5a7a', wait: '#ffb547', mute: '#6c7f9c', fg: '#dbe6f5', line: '#172238' };
 var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 var AD = { dkc: 'dKc', kirilim: 'Kırılım', trend: 'Trend', funding: 'Funding', guc: 'Güç', haberci: 'Haberci' };
-var ACIKLAMA = { dkc: 'EMA+RSI yön filtresi, 1S onay, hedef 2R (kokpit kuralları)', kirilim: '4S: 20 mum zirvesi + hacim ≥2,5x, stop 2 ATR, hedef 2R', trend: '1G: 55 gün zirvesi, EMA50>EMA200, 3 ATR takip stop', funding: '1S: funding ≤ -%0,03 + 4S EMA20 altı dönüş mumu, hedef 2R', guc: 'BTC\'yi yenen lider coinde 4S EMA20 geri çekilmesi, hedef 2R', haberci: 'Denetçi: FOMC/TÜFE/istihdam takvimi ve haber akışı (CoinDesk, Cointelegraph, Decrypt). Ağır coin haberi → 24 saat giriş yok; makro pencere → Profesör -25 puan' };
+var ACIKLAMA = { dkc: 'EMA+RSI yön filtresi, 1S onay, hedef 2R (kokpit kuralları)', kirilim: '4S: 20 mum zirvesi + hacim ≥3x, stop 2 ATR, hedef 2R', trend: '1G: 55 gün zirvesi, EMA50>EMA200, 3 ATR takip stop', funding: '1S: funding ≤ -%0,03 + 4S EMA20 altı dönüş mumu, hedef 2R', guc: 'BTC\'yi yenen lider coinde 4S EMA20 geri çekilmesi, hedef 2R', haberci: 'Denetçi: FOMC/TÜFE/istihdam takvimi ve haber akışı (CoinDesk, Cointelegraph, Decrypt). Ağır coin haberi → 24 saat giriş yok; makro pencere → Profesör -25 puan' };
 var SIRA = ['dkc', 'kirilim', 'trend', 'haberci', 'funding', 'guc'];
 var D = null, sel = -1, onayliSec = 0;
 function $(id) { return document.getElementById(id); }
