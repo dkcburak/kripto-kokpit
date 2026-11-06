@@ -150,6 +150,36 @@ async function calistir() {
   var hk = simule(hepsi.filter(function (s) { return s.trader !== 'trend'; }), mum.kirilim, S4, 2);
   sonuc.havuz = { not: 'kirilim+guc birlikte, en fazla 2 açık işlem (trend 1G ve funding 1S adımı farklı, dahil değil)', hepsi: ozet(hk), bolum: bol(hk, sinir) };
   console.log('havuz(2): ' + JSON.stringify(sonuc.havuz.hepsi) + ' | TRAIN ' + JSON.stringify(sonuc.havuz.bolum.train) + ' | TEST ' + JSON.stringify(sonuc.havuz.bolum.test));
+  // ---- Varyantlar (6 Kas 2026: ajan geliştirme araştırması; aynı veri, aynı simülasyon) ----
+  var btcE50 = {}; for (var kb2 = 50; kb2 < btc.length; kb2++) btcE50[btc[kb2].time] = btc[kb2].close > A.ema(btc.slice(kb2 - 49, kb2 + 1).map(function (x) { return x.close; }), 50);
+  function btcYukariMi(tSn) { var g = tSn - (tSn % SG) - SG; return !!btcE50[g]; } // önceki günlük kapanışla
+  var VARYANT = [
+    { ad: 'kirilim_vol2', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { volK: 2 }); } },
+    { ad: 'kirilim_vol3', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { volK: 3 }); } },
+    { ad: 'kirilim_btcYukari', mum: 'h4', adim: S4, fn: function (c, h4, k) { return btcYukariMi(h4[k].time) ? A.kirilim(h4, k) : null; } },
+    { ad: 'kirilim_atr1.5', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.kirilim(h4, k, { atrK: 1.5 }); } },
+    { ad: 'trend_don20_1G', mum: 'd', adim: SG, fn: function (c, d, k) { return A.trend(d, k, { don: 20 }); } },
+    { ad: 'trend_don55_4S', mum: 'h4', adim: S4, fn: function (c, h4, k) { return A.trend(h4, k, { don: 55, tf: '4S' }); } },
+    { ad: 'trend_don20_4S_btcYukari', mum: 'h4', adim: S4, fn: function (c, h4, k) { return btcYukariMi(h4[k].time) ? A.trend(h4, k, { don: 20, tf: '4S' }) : null; } },
+    { ad: 'guc_rsi35_60', mum: 'h4', adim: S4, lider: true, fn: function (c, h4, k) { return A.guc(h4, k, { rsiAlt: 35, rsiUst: 60 }); } },
+    { ad: 'guc_tol2', mum: 'h4', adim: S4, lider: true, fn: function (c, h4, k) { return A.guc(h4, k, { tol: 0.02 }); } }
+  ];
+  sonuc.varyantlar = {};
+  VARYANT.forEach(function (v) {
+    var sl = [], mm = {};
+    coinler.forEach(function (c) {
+      var seri = v.mum === 'd' ? V[c].d : V[c].h4; mm[c] = seri;
+      var bas0 = v.mum === 'd' ? 200 : 200;
+      for (var k = bas0; k < seri.length - 1; k++) {
+        if (seri[k].time < bas) continue;
+        if (v.lider) { var gb = seri[k].time - (seri[k].time % SG), l = liderGun[gb]; if (!l || l.indexOf(c) < 0) continue; }
+        var p = v.fn(c, seri, k); if (p) sl.push({ t: seri[k + 1].time, coin: c, trader: v.ad, plan: p });
+      }
+    });
+    var k2 = simule(sl, mm, v.adim, 0);
+    sonuc.varyantlar[v.ad] = { sinyal: sl.length, hepsi: ozet(k2), bolum: bol(k2, sinir), nedenler: k2.reduce(function (o, x) { o[x.neden] = (o[x.neden] || 0) + 1; return o; }, {}) };
+    console.log('VARYANT ' + v.ad + ': sinyal ' + sl.length + ', ' + JSON.stringify(sonuc.varyantlar[v.ad].hepsi) + ' | TRAIN ' + JSON.stringify(sonuc.varyantlar[v.ad].bolum.train) + ' | TEST ' + JSON.stringify(sonuc.varyantlar[v.ad].bolum.test) + ' | ' + JSON.stringify(sonuc.varyantlar[v.ad].nedenler));
+  });
   if (CIKTI) fs.writeFileSync(CIKTI, JSON.stringify(sonuc, null, 1));
   return sonuc;
 }

@@ -52,14 +52,16 @@ function kirilim(h4, k, ayar) {
 }
 
 // T3 Trend: 1G kapanış son 55 günün en yüksek kapanışının üstünde, EMA50 > EMA200. Stop giriş - 3 ATR20, takip eden stop. Zaman stopu 20 gün (+1R görülmezse).
-function trend(d1, k) {
+function trend(d1, k, ayar) {
+  ayar = ayar || {};
+  var don = ayar.don || 55, tf = ayar.tf || '1G';
   if (k < 200) return null;
   var kap = kapanis(d1, k, 200), e50 = ema(kap, 50), e200 = ema(kap, 200), m = d1[k];
   if (!(e50 > e200)) return null;
-  var yuk = -Infinity; for (var i = k - 55; i < k; i++) yuk = Math.max(yuk, d1[i].close);
+  var yuk = -Infinity; for (var i = k - don; i < k; i++) yuk = Math.max(yuk, d1[i].close);
   if (!(m.close > yuk)) return null;
   var a = atr(d1, k, 20); if (!a) return null;
-  return plan('trend', [m.close, m.close * 1.005], m.close - 3 * a, 3, 5, '55 gün zirvesi (' + y(yuk) + ') günlük kapanışla aşıldı, EMA50 > EMA200', { tutma: 20, tf: '1G', takipAtr: 3, atr: a });
+  return plan('trend', [m.close, m.close * 1.005], m.close - 3 * a, 3, 5, don + ' ' + (tf === '1G' ? 'gün' : 'mum') + ' zirvesi (' + y(yuk) + ') ' + (tf === '1G' ? 'günlük' : tf) + ' kapanışla aşıldı, EMA50 > EMA200', { tutma: 20, tf: tf, takipAtr: 3, atr: a });
 }
 
 // T4 Funding: son 3 funding ortalaması ≤ -%0,03, fiyat 4S EMA20 altında, 1S'de hacimli dönüş mumu (alt fitil ≥ 1,5 gövde). Stop dip - 1 ATR14. Hedef 2R. Tutma 16 saat.
@@ -94,12 +96,14 @@ function gucLiderler(gunluk, btc, k, adet) {
   });
   return l.sort(function (a, b) { return b.guc - a.guc; }).slice(0, adet).filter(function (x) { return x.guc > 1; }).map(function (x) { return x.coin; });
 }
-function guc(h4, k) {
+function guc(h4, k, ayar) {
+  ayar = ayar || {};
+  var rsiAlt = ayar.rsiAlt || 40, rsiUst = ayar.rsiUst || 55, tol = ayar.tol || 0.01;
   if (k < 30) return null;
   var m = h4[k], onc = h4[k - 1], kap = kapanis(h4, k - 1, 60), e20o = ema(kap, 20);
   if (!e20o) return null;
   var r = rsi(h4, k - 1, 14);
-  var cek = Math.abs(onc.close / e20o - 1) <= 0.01 && r >= 40 && r <= 55;
+  var cek = Math.abs(onc.close / e20o - 1) <= tol && r >= rsiAlt && r <= rsiUst;
   if (!cek) return null;
   var e20 = ema(kapanis(h4, k, 60), 20);
   if (!(m.close > e20 && m.close > m.open)) return null;
