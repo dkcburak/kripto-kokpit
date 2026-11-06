@@ -10,6 +10,11 @@
 - **Acil durdurma:** Actions → `masa-kapat` → `durdur`: kilit koyar, Profesör'ün emirlerini iptal eder, canlı pozisyonlarını kapatır (elle açılanlara dokunmaz). `ac` kilidi kaldırır. Kilitliyken yeni emir verilmez.
 - Testler: `node test/masa-emir.test.js` (9), `node test/masa-kapat.test.js` (1). MEXC uç noktaları: api.mexc.com, order/create (25 Eki 2026'da gerçek test emriyle doğrulandı).
 
+## Haberci (7. ajan, denetçi; 6 Kas 2026 Burak isteği)
+- `haber.js`: makro takvim (FOMC kararı, ABD TÜFE, istihdam+işsizlik, ABD seçimi; kaynak federalreserve.gov ve bls.gov, TAKVIM dizisi) + haber akışı (CoinDesk, Cointelegraph, Decrypt RSS; her çalışmada son 12 saat, 7/24).
+- Coin özelinde ağır haber (hack, delist, dava, iflas, depeg, unlock…) → o coine 24 saat SERT RET (`haber` kuralı). Takvim penceresi (±2 saat; seçim -12/+24 saat) ya da 6 saatte ≥3 ağır piyasa başlığı → `olay` → Profesör -25 puan.
+- Panelde 6. halka (Haberci) ve "Haberci" bölümü: risk, bayraklı coinler, 48 saat içindeki takvim, son başlıklar. Kaynak okunamazsa sessiz (hata listesinde). Test: `node test/masa-haber.test.js` (6).
+
 # Kağıt mod (başlangıç)
 Ayrı sayfa: `https://dkcburak.github.io/kripto-kokpit/trader-masasi/` (dKc kokpitinden bağımsız; coin listesi yok).
 - `ajanlar.js`: T2 Kırılım, T3 Trend, T4 Funding, T5 Güç sinyal kuralları (saf fonksiyonlar). T1 dKc `tarayici-veri/tarayici.json`'dan okunur.

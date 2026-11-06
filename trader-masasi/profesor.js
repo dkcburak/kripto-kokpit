@@ -8,7 +8,7 @@ var AYAR = {
 var KURAL = {
   sema: 'eksik alan', eski: 'veri 45 dakikadan eski', plan: 'plan geçersiz (stop < giriş < hedef değil)', rr: 'komisyonlu R:R 1,5 altında',
   short: 'short kapalı', ayniCoin: 'aynı coinde açık/bekleyen işlem ya da 24 saat içinde stop', havuz: 'havuz dolu (2 işlem / %3 risk)',
-  gunluk: 'günlük zarar sınırı dolu', lik: 'likidasyon stopun 2 katından yakın', gozlem: 'trader gözlem modunda'
+  gunluk: 'günlük zarar sınırı dolu', lik: 'likidasyon stopun 2 katından yakın', gozlem: 'trader gözlem modunda', haber: 'coin hakkında ağır haber (Haberci, 24 saat)'
 };
 function sayi(x) { return typeof x === 'number' && isFinite(x) && x > 0; }
 function planGecerli(p) {
@@ -25,6 +25,7 @@ function karar(s, d) {
   if (!planGecerli(s)) return ret('plan', k);
   if (!(s.rr >= AYAR.minRR)) return ret('rr', k);
   if (AYAR.shortKapali && s.yon === 'short') return ret('short', k, true);
+  if (d.haber && d.haber[s.coin] && d.haber[s.coin].bitis > d.simdi) return retMetin('haber', KURAL.haber + ': ' + String(d.haber[s.coin].neden).slice(0, 80), k);
   if ((d.acik || []).some(function (p) { return p.coin === s.coin; }) || (d.sonStop && d.simdi - d.sonStop[s.coin] < 86400000)) return ret('ayniCoin', k);
   var acikRisk = (d.acik || []).reduce(function (t, p) { return t + (p.riskYuzde || AYAR.riskIslem); }, 0);
   if ((d.acik || []).length >= AYAR.maxAcik || acikRisk + AYAR.riskIslem > AYAR.riskTavan) return ret('havuz', k);
@@ -41,7 +42,7 @@ function karar(s, d) {
   if (kr && kr.n >= AYAR.karneMin && kr.toplamR < 0) { puan -= 20; n.push('traderın son 30 işlemi eksi (-20)'); }
   if (d.funding && d.funding[s.coin] > 0.0005) { puan -= 15; n.push('funding aşırı (' + (d.funding[s.coin] * 100).toFixed(3) + '%, -15)'); }
   if (d.atr && d.atr[s.coin] > 0 && Math.abs(mid - s.stop) < 0.5 * d.atr[s.coin]) { puan -= 20; n.push('stop ATR\'nin yarısından yakın, gürültü (-20)'); }
-  if (d.olay) { puan -= 25; n.push('önemli olay 2 saat içinde (-25)'); }
+  if (d.olay) { puan -= 25; n.push('önemli olay/haber penceresi' + (typeof d.olay === 'string' ? ': ' + d.olay : '') + ' (-25)'); }
   if (d.fiyat && d.fiyat[s.coin] > 0 && Math.abs(d.fiyat[s.coin] / mid - 1) > 0.015) { puan -= 10; n.push('giriş fiyattan %1,5+ uzak (-10)'); }
   if (d.hacimDusuk && d.hacimDusuk[s.coin]) { puan -= 10; n.push('hacim ortalamanın altında (-10)'); }
   var kararStr = puan >= AYAR.bekleEsik ? 'onay' : puan >= AYAR.retEsik ? 'bekle' : 'ret';
@@ -51,4 +52,5 @@ function karar(s, d) {
   return { karar: kararStr, puan: puan, neden: neden + (gz ? ' (gözlem: kağıt karne)' : ''), kural: n, kagit: gz };
 }
 function ret(kod, k, kagit) { return { karar: 'ret', puan: 0, neden: KURAL[kod] + '.', kural: [kod], kagit: !!kagit }; }
+function retMetin(kod, metin, k) { return { karar: 'ret', puan: 0, neden: metin + '.', kural: [kod], kagit: false }; }
 module.exports = { AYAR: AYAR, KURAL: KURAL, karar: karar, planGecerli: planGecerli };

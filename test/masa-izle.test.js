@@ -61,6 +61,12 @@ var testler = [
     var s3 = await I.izle(kirik, JSON.parse(JSON.stringify(s1)), SIMDI + 14400000);
     assert(s3.hatalar.some(function (h) { return /^SOL/.test(h); }) && s3.ozet.onayli.some(function (x) { return x.coin === 'SOL' && x.mumlar.length === 0; }), JSON.stringify(s3.hatalar));
   }),
+  t('haberci: SOL hakkında hack haberi varsa Profesör Kırılım SOL sinyalini haber gerekçesiyle reddeder', async function () {
+    var rss = '<rss><channel><item><title>Solana protocol hacked</title><pubDate>' + new Date(SIMDI - 60000).toUTCString() + '</pubDate></item></channel></rss>';
+    var s = await I.izle(sahte(['BTC', 'SOL'], 'SOL'), null, SIMDI, null, async function () { return rss; });
+    var k = s.kararlar.filter(function (x) { return x.trader === 'kirilim' && x.coin === 'SOL'; })[0];
+    assert(k && k.karar === 'ret' && /haber/.test(k.neden) && s.ozet.haberci.coinler[0].coin === 'SOL' && s.ozet.haberci.kaynaklar.length === 3, JSON.stringify([k, s.ozet.haberci]));
+  }),
   t('karne: kapalı işlemlerden son 30 ve tümü', function () {
     var k = I.karne([{ trader: 'a', r: 2 }, { trader: 'a', r: -1 }, { trader: 'b', r: 1 }], 'a');
     assert(k.hepsi.n === 2 && k.hepsi.toplamR === 1 && k.hepsi.isabet === 50, JSON.stringify(k));

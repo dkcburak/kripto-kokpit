@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '20'
       - name: Testler
-        run: node test/masa.test.js && node test/masa-izle.test.js && node test/masa-emir.test.js
+        run: node test/masa.test.js && node test/masa-izle.test.js && node test/masa-emir.test.js && node test/masa-haber.test.js && node test/masa-kapat.test.js
       - name: Önceki durum (varsa)
         run: |
           git fetch --depth=1 "https://github.com/${{ github.repository }}.git" masa-veri 2>/dev/null && git show FETCH_HEAD:masa.json > "$RUNNER_TEMP/onceki.json" || echo "önceki durum yok, sıfırdan başlanır"

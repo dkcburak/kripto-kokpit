@@ -2,7 +2,7 @@
 // Modlar: kagit (varsayılan, anahtar yok) | kuru (hesabı okur, emri yazar, göndermez) | acik (gerçek emir). Durum masa.json (masa-veri dalı).
 // Kullanım: node trader-masasi/izle.js <onceki.json|-> <cikti.json>   Testi: node test/masa-izle.test.js   Emir katmanı: emir.js
 'use strict';
-var A = require('./ajanlar.js'), P = require('./profesor.js'), E = require('./emir.js'), T = require('../tarayici/tara.js'), H = require('../hesap.js');
+var A = require('./ajanlar.js'), P = require('./profesor.js'), E = require('./emir.js'), Hb = require('./haber.js'), T = require('../tarayici/tara.js'), H = require('../hesap.js');
 var S1 = 3600, S4 = 14400, SG = 86400, MAX_KAPALI = 300, MAX_KARAR = 60, GOZLEM_GUN = 28;
 // Gerçek emir verebilen traderlar (Burak 6 Kas 2026: 48 saat sonra gerçek para). Geriye dönük testte iki dönemde de artı olan ikisi; dKc/Trend/Funding kağıtta kalır.
 var CANLI = { kirilim: true, guc: true };
@@ -79,7 +79,7 @@ async function borsaEsitle(durum, borsa, hatalar, kapaliEkle, fiyat) {
   });
   return b;
 }
-async function izle(getJson, onceki, simdi, borsa) {
+async function izle(getJson, onceki, simdi, borsa, getText) {
   simdi = simdi || Date.now();
   var durum = onceki && Array.isArray(onceki.acik) ? onceki : bos();
   durum.sonMum = durum.sonMum || {}; durum.gorulen = durum.gorulen || {}; durum.sonStop = durum.sonStop || {}; durum.kararlar = durum.kararlar || [];
@@ -159,13 +159,17 @@ async function izle(getJson, onceki, simdi, borsa) {
   // Geriye dönük test (5 Kas 2026, 300 gün): Funding TRAIN eksi -> elendi (süresiz gözlem, havuza girmez); Trend 5 işlem -> yetersiz veri, gözlem sürer
   var ELENDI = { funding: 'geriye dönük testte avantaj yok (TRAIN -5R)' }; Object.keys(ELENDI).forEach(function (a) { gozlem[a] = true; });
   Object.keys(durum.gorulen).forEach(function (id) { if (simdi - durum.gorulen[id] > 3 * 86400000) delete durum.gorulen[id]; });
+  // Haberci (7. ajan): takvim her çalışmada; haber kaynakları getText varsa (ağ). Hata olursa önceki durum korunur.
+  try { durum.haber = await Hb.haberci(getText || null, liste, durum.haber, simdi); (durum.haber.hatalar || []).forEach(function (h) { hatalar.push('haberci ' + h); }); }
+  catch (e) { hatalar.push('haberci: ' + String(e.message || e).slice(0, 50)); }
+  var olayAktif = durum.haber && durum.haber.olay && durum.haber.olay.bitis > simdi ? durum.haber.olay.neden : false, haberCoin = (durum.haber && durum.haber.coinler) || {};
   // Profesör
   var kr = {}; Object.keys(TRADER).forEach(function (a) { kr[a] = karne(durum.kapali, a).son30; });
   var gun = durum.kapali.filter(function (x) { return !x.sanal && !x.gozlem && x.bitis * 1000 > simdi - 86400000; }).reduce(function (s, x) { return s + x.r; }, 0);
   adaylar.sort(function (a, b) { return a.zaman - b.zaman; }).forEach(function (c) {
     var p = c.plan, s = { trader: c.trader, coin: c.coin, yon: p.yon, giris: p.giris, stop: p.stop, tp1: p.tp1, rr: p.rr, veriZamani: Math.min(simdi, c.zaman + 3600000) };
     var havuz = durum.acik.filter(function (x) { return !x.sanal && !x.gozlem; });
-    var d = { simdi: simdi, acik: gozlem[c.trader] ? [] : havuz, sonStop: durum.sonStop, gunSonuc: gun * 0.25, gunBaslangic: 100, karne: kr, gozlem: gozlem, btcYon: btcYon, funding: fund, fiyat: fiyat, atr: {} };
+    var d = { simdi: simdi, acik: gozlem[c.trader] ? [] : havuz, sonStop: durum.sonStop, gunSonuc: gun * 0.25, gunBaslangic: 100, karne: kr, gozlem: gozlem, btcYon: btcYon, funding: fund, fiyat: fiyat, atr: {}, olay: olayAktif, haber: haberCoin };
     d.atr[c.coin] = A.atr(V[c.coin].h4, V[c.coin].h4.length - 1, 14);
     var k = P.karar(s, d);
     durum.kararlar.push({ id: c.trader + '-' + c.coin + '-' + c.tetik, zaman: c.zaman, trader: c.trader, coin: c.coin, yon: p.yon, giris: p.giris, stop: p.stop, tp1: p.tp1, tp2: p.tp2, rr: p.rr, tf: p.tf, gerekce: p.gerekce, karar: k.karar, puan: k.puan, neden: k.neden, gozlem: !!gozlem[c.trader] });
@@ -229,7 +233,8 @@ async function izle(getJson, onceki, simdi, borsa) {
     return { coin: x.coin, trader: x.trader, tf: TRADER[x.trader].tf, yon: 'long', canli: !!x.canli, vol: x.vol || null, kal: x.kal || null, not: x.borsaNot || null, giris: x.planGiris, dolum: x.giris || null, stop: x.stop, stop0: x.stop0 || x.stop, tp1: x.tp1, tp2: x.tp2, rr: x.rr, zaman: x.zaman, tetik: x.tetik, gozlem: x.gozlem, fiyat: fiyat[x.coin], mumlar: m.slice(-60).map(function (q) { return [q.time, y(q.open), y(q.high), y(q.low), y(q.close)]; }) };
   });
   durum.zaman = simdi; durum.hatalar = hatalar; durum.taranan = liste.length; durum.btcYon = btcYon; durum.liderler = liderler; durum.mod = borsa ? borsa.mod : 'kagit'; durum.borsa = durumBorsa; durum.canli = Object.keys(CANLI);
-  durum.ozet = { ajanlar: ajanlar, profesor: profKarne(durum.kararlar, durum.kapali), havuz: { acik: durum.acik.filter(function (x) { return !x.sanal && !x.gozlem; }).length, maxAcik: P.AYAR.maxAcik, risk: y(durum.acik.filter(function (x) { return !x.sanal && !x.gozlem; }).length * P.AYAR.riskIslem), riskTavan: P.AYAR.riskTavan, gun: y(gun) }, onayli: onayli };
+  var hb = durum.haber || {};
+  durum.ozet = { ajanlar: ajanlar, haberci: { olay: olayAktif ? { neden: olayAktif, bitis: hb.olay.bitis, tur: hb.olay.tur } : null, takvim: hb.takvim || [], coinler: Object.keys(haberCoin).filter(function (c) { return haberCoin[c].bitis > simdi; }).map(function (c) { return { coin: c, neden: haberCoin[c].neden, bitis: haberCoin[c].bitis }; }), basliklar: (hb.basliklar || []).slice(0, 5), kaynaklar: hb.kaynaklar || [], okunan: hb.okunan || 0 }, profesor: profKarne(durum.kararlar, durum.kapali), havuz: { acik: durum.acik.filter(function (x) { return !x.sanal && !x.gozlem; }).length, maxAcik: P.AYAR.maxAcik, risk: y(durum.acik.filter(function (x) { return !x.sanal && !x.gozlem; }).length * P.AYAR.riskIslem), riskTavan: P.AYAR.riskTavan, gun: y(gun) }, onayli: onayli };
   return durum;
 }
 module.exports = { izle: izle, karne: karne, TRADER: TRADER, CANLI: CANLI };
@@ -249,9 +254,14 @@ if (require.main === module) {
     try { borsa = { mod: mod, c: E.istemci(process.env.MEXC_API_KEY, process.env.MEXC_API_SECRET), risk: Number(process.env.MASA_RISK) || Number(ayar.risk) || 0, bildir: function (m) { console.log('[' + mod + '] ' + m); if (mod === 'acik') E.telegram(tg, chat, '🎓 Profesör: ' + m); } }; }
     catch (e) { console.error('Anahtar yok, kağıt modda çalışılıyor: ' + e.message); borsa = null; }
   }
-  izle(getJson, onceki, null, borsa).then(function (s) {
+  var getText = async function (url) {
+    for (var d = 0; d < 2; d++) { try { var r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Profesor haberci)' } }); if (r.ok) return await r.text(); } catch (e) { /* tekrar */ } await bekle(800); }
+    throw new Error('erişilemedi');
+  };
+  izle(getJson, onceki, null, borsa, getText).then(function (s) {
     fs.writeFileSync(process.argv[3] || 'masa.json', JSON.stringify(s));
     (s.kuru || []).forEach(function (k) { console.log(k.metin); });
+    console.log('Haberci: ' + (s.ozet.haberci.kaynaklar.join(', ') || 'kaynak yok') + ', olay ' + (s.ozet.haberci.olay ? s.ozet.haberci.olay.neden : 'yok') + ', bayraklı coin ' + s.ozet.haberci.coinler.length + ', yakın takvim ' + s.ozet.haberci.takvim.map(function (x) { return x.ad + ' ' + x.t; }).join(' | '));
     console.log('Profesör [' + s.mod + ']: ' + s.taranan + ' coin, BTC ' + s.btcYon + ', açık ' + s.acik.length + ' (kağıt ' + s.ozet.havuz.acik + '), kapanan ' + s.kapali.length + ', karar ' + s.kararlar.length + ', liderler ' + s.liderler.join(',') + ', hata ' + s.hatalar.length + (s.borsa ? ', özkaynak ' + s.borsa.ozkaynak + ' USDT, borsa poz ' + s.borsa.pozisyonlar.length + ' emir ' + s.borsa.emirler.length : ''));
     if (s.hatalar.length) console.log('Hatalar: ' + s.hatalar.join(' | '));
   }, function (e) { console.error('Hata:', e.stack || e.message); process.exit(1); });

@@ -81,6 +81,7 @@ h2 small{font:400 10px var(--mono);letter-spacing:0;text-transform:none}
   </div>
   <div class="side">
     <section><h2>Onaylı işlem <small id="onayliSay"></small></h2><div id="onayli"><div class="bos">Veri bekleniyor…</div></div></section>
+    <section><h2>Haberci <small id="haberSay"></small></h2><div class="feed" id="haber"><div class="bos">Veri bekleniyor…</div></div></section>
     <section><h2>Profesör kararları <small id="kararSay"></small></h2><div class="feed" id="feed"></div></section>
   </div>
 </div>
@@ -92,9 +93,9 @@ h2 small{font:400 10px var(--mono);letter-spacing:0;text-transform:none}
 var VERI = new URLSearchParams(location.search).get('veri') || 'https://raw.githubusercontent.com/dkcburak/kripto-kokpit/masa-veri/masa.json';
 var C = { acc: '#4fd1ff', long: '#2ee6a6', short: '#ff5a7a', wait: '#ffb547', mute: '#6c7f9c', fg: '#dbe6f5', line: '#172238' };
 var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
-var AD = { dkc: 'dKc', kirilim: 'Kırılım', trend: 'Trend', funding: 'Funding', guc: 'Güç' };
-var ACIKLAMA = { dkc: 'EMA+RSI yön filtresi, 1S onay, hedef 2R (kokpit kuralları)', kirilim: '4S: 20 mum zirvesi + hacim ≥2,5x, stop 2 ATR, hedef 2R', trend: '1G: 55 gün zirvesi, EMA50>EMA200, 3 ATR takip stop', funding: '1S: funding ≤ -%0,03 + 4S EMA20 altı dönüş mumu, hedef 2R', guc: 'BTC\'yi yenen lider coinde 4S EMA20 geri çekilmesi, hedef 2R' };
-var SIRA = ['dkc', 'kirilim', 'trend', 'funding', 'guc'];
+var AD = { dkc: 'dKc', kirilim: 'Kırılım', trend: 'Trend', funding: 'Funding', guc: 'Güç', haberci: 'Haberci' };
+var ACIKLAMA = { dkc: 'EMA+RSI yön filtresi, 1S onay, hedef 2R (kokpit kuralları)', kirilim: '4S: 20 mum zirvesi + hacim ≥2,5x, stop 2 ATR, hedef 2R', trend: '1G: 55 gün zirvesi, EMA50>EMA200, 3 ATR takip stop', funding: '1S: funding ≤ -%0,03 + 4S EMA20 altı dönüş mumu, hedef 2R', guc: 'BTC\'yi yenen lider coinde 4S EMA20 geri çekilmesi, hedef 2R', haberci: 'Denetçi: FOMC/TÜFE/istihdam takvimi ve haber akışı (CoinDesk, Cointelegraph, Decrypt). Ağır coin haberi → 24 saat giriş yok; makro pencere → Profesör -25 puan' };
+var SIRA = ['dkc', 'kirilim', 'trend', 'haberci', 'funding', 'guc'];
 var D = null, sel = -1, onayliSec = 0;
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -104,7 +105,14 @@ function saat(ms) { return new Date(ms).toLocaleTimeString('tr-TR', { hour: '2-d
 function gunSaat(ms) { var d = new Date(ms); return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'Europe/Istanbul' }) + ' ' + saat(ms); }
 function kararPill(k) { return '<span class="pill ' + k + '">' + (k === 'onay' ? 'Onay' : k === 'ret' ? 'Ret' : 'Bekle') + '</span>'; }
 
+function haberciBilgi() {
+  var h = D && D.ozet && D.ozet.haberci; if (!h) return { ad: 'Haberci', st: 'veri yok', ks: '—', r: '—', poz: false, alt: ACIKLAMA.haberci };
+  var risk = h.olay || h.coinler.length, yakin = h.takvim[0];
+  var st = h.olay ? 'Risk · ' + h.olay.neden : h.coinler.length ? 'Bayrak · ' + h.coinler.map(function (c) { return c.coin; }).join(',') : yakin ? 'Sakin · ' + yakin.ad.replace(/\s*\(.*\)/, '') + ' ' + gunSaat(Date.parse(yakin.t)) : 'Sakin · ' + h.okunan + ' başlık';
+  return { ad: 'Haberci', st: st, ks: h.olay ? 'RİSK' : h.coinler.length ? h.coinler[0].coin : yakin ? yakin.ad.split(' ').slice(-1)[0].replace(/[()]/g, '') : '24s', r: risk ? 'risk' : 'sakin', poz: false, risk: !!risk, alt: ACIKLAMA.haberci + ' · ' + (h.kaynaklar.length ? h.kaynaklar.join(', ') : 'kaynak okunamadı') + (h.takvim.length ? ' · yakın: ' + h.takvim.map(function (x) { return x.ad + ' ' + gunSaat(Date.parse(x.t)); }).join('; ') : '') };
+}
 function ajanBilgi(a) {
+  if (a === 'haberci') return haberciBilgi();
   var aj = D && D.ozet && D.ozet.ajanlar && D.ozet.ajanlar[a];
   if (!aj) return { ad: AD[a], st: 'veri yok', ks: '—', r: '—', poz: false, alt: ACIKLAMA[a] };
   var k = aj.karne.son30, poz = aj.acik.length > 0, st = poz ? 'Pozisyonda · ' + aj.acik.map(function (x) { return x.coin; }).join(',') : 'Tarıyor · ' + aj.tf;
@@ -117,11 +125,11 @@ function ajanBilgi(a) {
 (function () {
   var cv = $('o'), ctx = cv.getContext('2d'), pk = [], t0 = performance.now(), W, H, cx, cy, R, nr, dpr, si = 0;
   function size() { dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); cx = W / 2; cy = H / 2; R = Math.min(W, H) * 0.345; nr = Math.max(36, Math.min(W, H) * 0.082); }
-  function pos(i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }; }
+  function pos(i) { var a = -Math.PI / 2 + i * 2 * Math.PI / SIRA.length; return { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }; }
   // Gerçek kararlar sırayla canlandırılır: trader -> Profesör (mavi), Profesör -> trader (karar rengi). Karar yoksa tarama nabzı.
   function emit() {
     var k = D && D.kararlar && D.kararlar.length ? D.kararlar.slice(-8) : null;
-    if (!k) { pk.push({ i: si++ % 5, dir: 1, t: performance.now(), col: C.acc, d: 1400, then: null }); return; }
+    if (!k) { pk.push({ i: si++ % SIRA.length, dir: 1, t: performance.now(), col: C.acc, d: 1400, then: null }); return; }
     var e = k[si++ % k.length], i = SIRA.indexOf(e.trader); if (i < 0) return;
     pk.push({ i: i, dir: 1, t: performance.now(), col: C.acc, d: 1400, then: e.karar });
   }
@@ -131,7 +139,7 @@ function ajanBilgi(a) {
     var t = (now - t0) / 1000; ctx.clearRect(0, 0, W, H);
     if (!RM) { ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.5); var g = ctx.createConicGradient(0, 0, 0); g.addColorStop(0, 'rgba(79,209,255,0)'); g.addColorStop(.85, 'rgba(79,209,255,0)'); g.addColorStop(1, 'rgba(79,209,255,.10)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R + nr * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
     ring(cx, cy, R, C.line, 1); ring(cx, cy, R + nr * 1.5, 'rgba(23,34,56,.6)', 1, [2, 8]);
-    for (var i = 0; i < 5; i++) { var p = pos(i); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.strokeStyle = sel === i ? 'rgba(79,209,255,.5)' : 'rgba(79,209,255,.14)'; ctx.lineWidth = 1; ctx.stroke(); }
+    for (var i = 0; i < SIRA.length; i++) { var p = pos(i); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.strokeStyle = sel === i ? 'rgba(79,209,255,.5)' : 'rgba(79,209,255,.14)'; ctx.lineWidth = 1; ctx.stroke(); }
     var alive = [];
     pk.forEach(function (q) {
       var k = (now - q.t) / q.d;
@@ -154,13 +162,13 @@ function ajanBilgi(a) {
     var ri = pr && pr.retIsabet != null ? '%' + pr.retIsabet + (hr < 56 ? ' isabet' : ' ret isabeti') : 'bugün';
     text(ri, cx, cy + hr * .38, '600 ' + f3 + 'px JetBrains Mono, monospace', C.acc);
     SIRA.forEach(function (ad, i) {
-      var a = ajanBilgi(ad), p = pos(i), on = sel === i, col = a.poz ? C.long : C.acc, ph = RM ? 0 : (Math.sin(t * 1.6 + i) + 1) / 2;
+      var a = ajanBilgi(ad), p = pos(i), on = sel === i, col = a.poz ? C.long : a.risk ? C.short : C.acc, ph = RM ? 0 : (Math.sin(t * 1.6 + i) + 1) / 2;
       ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = on ? 22 : 8 + ph * 8; ctx.fillStyle = on ? '#0f1c2e' : '#0a1220'; ctx.beginPath(); ctx.arc(p.x, p.y, nr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       ring(p.x, p.y, nr, col, on ? 2 : 1.2);
       ctx.save(); ctx.globalAlpha = .35 + ph * .5; ring(p.x, p.y, nr + 4, col, 1, [1, 4]); ctx.restore();
       var g1 = Math.max(10, Math.round(nr * .3)), g2 = Math.max(10, Math.round(nr * .26)), g3 = Math.max(8, Math.round(nr * .19));
       text(a.ad.toUpperCase(), p.x, p.y - nr * .3, '700 ' + g1 + 'px Oxanium, sans-serif', C.fg);
-      text(a.r, p.x, p.y + nr * .08, '600 ' + g2 + 'px JetBrains Mono, monospace', a.poz ? C.long : a.r === 'gözlem' || a.r === '—' ? C.mute : a.r === 'elendi' ? C.short : C.fg);
+      text(a.r, p.x, p.y + nr * .08, '600 ' + g2 + 'px JetBrains Mono, monospace', a.poz ? C.long : a.r === 'gözlem' || a.r === '—' || a.r === 'sakin' ? C.mute : a.r === 'elendi' || a.r === 'risk' ? C.short : C.fg);
       text(nr < 44 ? a.ks : a.st, p.x, p.y + nr * .42, g3 + 'px JetBrains Mono, monospace', a.poz ? C.long : C.mute);
     });
     if (sel >= 0) { var a2 = ajanBilgi(SIRA[sel]), bw = Math.min(W - 24, 300), bh = 64, bx = 12, by = 12; ctx.fillStyle = 'rgba(11,17,28,.94)'; ctx.strokeStyle = C.acc; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill(); ctx.stroke();
@@ -168,7 +176,7 @@ function ajanBilgi(a) {
       var w = a2.alt.split(' '), satir = '', yy = by + 34; w.forEach(function (x) { var d = satir ? satir + ' ' + x : x; if (ctx.measureText(d).width > bw - 20) { ctx.fillText(satir, bx + 10, yy); satir = x; yy += 13; } else satir = d; }); if (yy < by + bh - 4) ctx.fillText(satir, bx + 10, yy); }
     if (!RM) requestAnimationFrame(draw);
   }
-  cv.addEventListener('click', function (e) { var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, hit = -1; for (var i = 0; i < 5; i++) { var p = pos(i); if (Math.hypot(x - p.x, y - p.y) <= nr + 6) hit = i; } sel = hit === sel ? -1 : hit; if (RM) draw(performance.now()); });
+  cv.addEventListener('click', function (e) { var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, hit = -1; for (var i = 0; i < SIRA.length; i++) { var p = pos(i); if (Math.hypot(x - p.x, y - p.y) <= nr + 6) hit = i; } sel = hit === sel ? -1 : hit; if (RM) draw(performance.now()); });
   size(); addEventListener('resize', function () { size(); if (RM) draw(performance.now()); });
   window.masaCiz = function () { if (RM) draw(performance.now()); };
   if (RM) draw(performance.now()); else { emit(); setInterval(emit, 3200); requestAnimationFrame(draw); }
@@ -228,6 +236,16 @@ function ciz() {
   }
   var kk = (D.kararlar || []).slice().reverse().slice(0, 14);
   $('kararSay').textContent = D.kararlar ? D.kararlar.length + ' karar' : '';
+  var hb = oz.haberci;
+  if (hb) {
+    $('haberSay').textContent = hb.okunan ? hb.okunan + ' başlık · 24s' : 'takvim';
+    var satir = [];
+    if (hb.olay) satir.push('<div class="sig pick" style="border-color:var(--short)"><span class="who">RİSK</span><span class="pill ret">' + (hb.olay.tur === 'takvim' ? 'Takvim' : 'Haber') + '</span><span class="what">' + esc(hb.olay.neden) + ' <i>· Profesör -25 puan · ' + saat(hb.olay.bitis) + '\'e kadar</i></span><span class="t"></span></div>');
+    hb.coinler.forEach(function (c) { satir.push('<div class="sig"><span class="who">' + esc(c.coin) + '</span><span class="pill ret">Giriş yok</span><span class="what" title="' + esc(c.neden) + '">' + esc(c.neden) + ' <i>· ' + gunSaat(c.bitis) + '\'e kadar</i></span><span class="t"></span></div>'); });
+    hb.takvim.forEach(function (x) { satir.push('<div class="sig"><span class="who">Takvim</span><span class="pill bekle">Yakın</span><span class="what">' + esc(x.ad) + '</span><span class="t">' + gunSaat(Date.parse(x.t)) + '</span></div>'); });
+    hb.basliklar.slice(0, 3).forEach(function (x) { satir.push('<div class="sig"><span class="who">' + esc(x.kaynak || 'Haber') + '</span><span class="pill gri">' + (x.coin && x.coin.length ? esc(x.coin.join(',')) : 'Piyasa') + '</span><span class="what">' + (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener" style="color:inherit">' : '') + esc(x.baslik) + (x.link ? '</a>' : '') + '</span><span class="t">' + (x.zaman ? gunSaat(x.zaman) : '') + '</span></div>'); });
+    $('haber').innerHTML = satir.length ? satir.join('') : '<div class="bos">Sakin: aktif risk yok, 48 saat içinde önemli takvim olayı yok.' + (hb.kaynaklar.length ? '<br><small>' + esc(hb.kaynaklar.join(', ')) + '</small>' : '') + '</div>';
+  }
   $('feed').innerHTML = kk.length ? kk.map(function (k) {
     var ne = k.karar === 'onay' ? 'R:R ' + f2(k.rr) : k.neden.replace(/\.$/, '');
     return '<div class="sig' + (k.karar === 'onay' ? ' pick' : '') + '"><span class="t">' + gunSaat(k.zaman) + '</span><span class="who">' + esc(AD[k.trader] || k.trader) + '</span><span class="what">' + esc(k.coin) + ' ' + esc(k.yon) + (k.karar === 'onay' ? ' · giriş ' + f(k.giris[0]) + '–' + f(k.giris[1]) + ' · stop ' + f(k.stop) + ' · TP ' + f(k.tp1) : '') + ' <i>· ' + esc(ne) + '</i></span>' + kararPill(k.karar) + '</div>';
