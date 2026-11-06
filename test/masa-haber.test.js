@@ -18,6 +18,11 @@ var testler = [
     assert(!Hb.agirMi('Bitcoin holds $75K as AI regulation fears see KOSPI halted after 8% crash'));
     assert(Hb.agirMi('Solana network halted for 2 hours, validators restart') && Hb.agirMi('Solana DeFi protocol hacked for $40M') && Hb.agirMi('Exchange suspends ZEC withdrawals') && Hb.agirMi('Zcash delisted by exchange'));
   }),
+  t('eski bayrak: artık ağır sayılmayan başlıkla konan bayrak bir sonraki çalışmada düşer, geçerli olan kalır', function () {
+    var onceki = { coinler: { SOL: { neden: "Solana’s Shanghai event halted over unauthorized promotion: Report", bitis: SIMDI + 20 * 3600000 }, ETH: { neden: 'Ethereum DeFi protocol hacked for $40M', bitis: SIMDI + 20 * 3600000 } } };
+    var d = Hb.degerlendir([], ['SOL', 'ETH'], SIMDI, onceki);
+    assert(!d.coinler.SOL && d.coinler.ETH, JSON.stringify(d.coinler));
+  }),
   t('takvim: CPI penceresi (±2 saat) aktif, 48 saat içindekiler listelenir; seçim -12/+24 saat', function () {
     var tk = Hb.takvim(SIMDI);
     assert(tk.aktif && /CPI/.test(tk.aktif.ad) && tk.aktif.bitis === Date.parse('2026-11-10T15:30:00Z'), JSON.stringify(tk));

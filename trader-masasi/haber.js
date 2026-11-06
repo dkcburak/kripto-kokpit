@@ -68,7 +68,8 @@ function takvim(simdi, liste) {
 // Başlıkları değerlendir: coin bayrakları ve piyasa yoğunluğu
 function degerlendir(basliklar, coinler, simdi, onceki) {
   var coinBayrak = (onceki && onceki.coinler) || {}, ilgili = [], piyasaSay = 0;
-  Object.keys(coinBayrak).forEach(function (c) { if (coinBayrak[c].bitis <= simdi) delete coinBayrak[c]; });
+  // Süresi dolan ya da (kural sıkılaşınca) artık ağır sayılmayan eski bayraklar düşer
+  Object.keys(coinBayrak).forEach(function (c) { if (coinBayrak[c].bitis <= simdi || !agirMi(coinBayrak[c].neden || '')) delete coinBayrak[c]; });
   basliklar.forEach(function (h) {
     if (h.zaman && simdi - h.zaman > 12 * 3600000) return;
     var agir = agirMi(h.baslik), piy = PIYASA.test(h.baslik), vuran = [];
