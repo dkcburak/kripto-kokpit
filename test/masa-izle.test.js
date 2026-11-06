@@ -50,6 +50,17 @@ var testler = [
     var s3 = await I.izle(deger, JSON.parse(JSON.stringify(s1)), SIMDI + 14400000);
     var q = s3.acik.filter(function (x) { return x.coin === 'SOL' && x.trader === 'kirilim'; })[0]; assert(q && Math.abs(q.dolum - 105) < 1e-9, JSON.stringify(q));
   }),
+  t('listeden düşen coin: açık işlem yine izlenir; verisi gelmezse özet çökmez', async function () {
+    var s1 = await I.izle(sahte(['BTC', 'SOL'], 'SOL'), null, SIMDI);
+    assert(s1.acik.some(function (x) { return x.coin === 'SOL'; }));
+    // SOL artık ticker'da yok ama mum verisi var: işlem ilerler, özette kalır
+    var s2 = await I.izle(sahte(['BTC', 'ETH'], 'YOK'), JSON.parse(JSON.stringify(s1)), SIMDI + 14400000);
+    assert(s2.acik.some(function (x) { return x.coin === 'SOL'; }) && s2.ozet.onayli.some(function (x) { return x.coin === 'SOL' && x.mumlar.length === 60; }), 'SOL izlenmeli');
+    // SOL mum isteği de başarısız: hata listesine girer, özet yine üretilir
+    var kirik = function (url) { if (/kline\/SOL_/.test(url)) return Promise.reject(new Error('erişilemedi')); return sahte(['BTC', 'ETH'], 'YOK')(url); };
+    var s3 = await I.izle(kirik, JSON.parse(JSON.stringify(s1)), SIMDI + 14400000);
+    assert(s3.hatalar.some(function (h) { return /^SOL/.test(h); }) && s3.ozet.onayli.some(function (x) { return x.coin === 'SOL' && x.mumlar.length === 0; }), JSON.stringify(s3.hatalar));
+  }),
   t('karne: kapalı işlemlerden son 30 ve tümü', function () {
     var k = I.karne([{ trader: 'a', r: 2 }, { trader: 'a', r: -1 }, { trader: 'b', r: 1 }], 'a');
     assert(k.hepsi.n === 2 && k.hepsi.toplamR === 1 && k.hepsi.isabet === 50, JSON.stringify(k));

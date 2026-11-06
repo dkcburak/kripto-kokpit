@@ -59,6 +59,8 @@ async function izle(getJson, onceki, simdi) {
   try { var dt = await getJson('https://contract.mexc.com/api/v1/contract/detail'); if (dt && dt.success) dt.data.forEach(function (d) { if (T.tradfiMi(d)) tradfi[d.symbol] = true; }); } catch (e) { /* devam */ }
   var evren = T.evren(t.data, tradfi).slice(0, T.AYAR.coinSayisi), fiyat = {}, fund = {}, liste = evren.map(function (x) { fiyat[x.coin] = x.fiyat; fund[x.coin] = x.funding; return x.coin; });
   if (liste.indexOf('BTC') < 0) liste.unshift('BTC');
+  // Açık işlemi olan coin listeden düşse de izlenir (yoksa işlem ilerlemez ve özet çöker)
+  durum.acik.forEach(function (x) { if (liste.indexOf(x.coin) < 0) liste.push(x.coin); });
   var V = {}, gunluk = {};
   function kapaliEkle(p, s, m) {
     durum.kapali.push({ coin: p.coin, trader: p.trader, t: p.t, bitis: m.time, giris: p.giris, stop: p.stop0, r: Math.round(s.r * 100) / 100, neden: s.neden, sanal: !!p.sanal, gozlem: !!p.gozlem });
@@ -74,6 +76,7 @@ async function izle(getJson, onceki, simdi) {
       var fo = null;
       try { var fj = await getJson('https://contract.mexc.com/api/v1/contract/funding_rate/history?symbol=' + coin + '_USDT&page_num=1&page_size=3'); var fl = fj && fj.data && fj.data.resultList; if (Array.isArray(fl) && fl.length === 3) fo = (Number(fl[0].fundingRate) + Number(fl[1].fundingRate) + Number(fl[2].fundingRate)) / 3; } catch (e) { fo = fund[coin]; }
       V[coin] = { h4: h4, d1: d1, h1: h1, fo: fo }; gunluk[coin] = d1;
+      if (!(fiyat[coin] > 0)) fiyat[coin] = h4[h4.length - 1].close;
       ilerletAcik(durum, coin, 'kirilim', h4, kapaliEkle); ilerletAcik(durum, coin, 'guc', h4, kapaliEkle); ilerletAcik(durum, coin, 'dkc', h4, kapaliEkle);
       ilerletAcik(durum, coin, 'trend', d1, kapaliEkle); ilerletAcik(durum, coin, 'funding', h1, kapaliEkle);
     } catch (e) { hatalar.push(coin + ': ' + String(e.message || e).slice(0, 50)); }
@@ -140,7 +143,7 @@ async function izle(getJson, onceki, simdi) {
     ajanlar[a] = { tf: TRADER[a].tf, karne: karne(durum.kapali, a), gozlem: !!gozlem[a], elendi: ELENDI[a] || null, acik: ac.map(function (x) { return { coin: x.coin, giris: x.giris || null, stop: x.stop, tp1: x.tp1, r: x.giris ? y((fiyat[x.coin] - x.giris) / (x.giris - x.stop0)) : null }; }), durum: ac.length ? 'pozisyonda' : 'tariyor' };
   });
   var onayli = durum.acik.filter(function (x) { return !x.sanal; }).sort(function (a, b) { return b.zaman - a.zaman; }).map(function (x) {
-    var m = x.trader === 'trend' ? V[x.coin].d1 : x.trader === 'funding' ? V[x.coin].h1 : V[x.coin].h4;
+    var vv = V[x.coin], m = !vv ? [] : x.trader === 'trend' ? vv.d1 : x.trader === 'funding' ? vv.h1 : vv.h4;
     return { coin: x.coin, trader: x.trader, tf: TRADER[x.trader].tf, yon: 'long', giris: x.planGiris, dolum: x.giris || null, stop: x.stop, stop0: x.stop0 || x.stop, tp1: x.tp1, tp2: x.tp2, rr: x.rr, zaman: x.zaman, tetik: x.tetik, gozlem: x.gozlem, fiyat: fiyat[x.coin], mumlar: m.slice(-60).map(function (q) { return [q.time, y(q.open), y(q.high), y(q.low), y(q.close)]; }) };
   });
   durum.zaman = simdi; durum.hatalar = hatalar; durum.taranan = liste.length; durum.btcYon = btcYon; durum.liderler = liderler;
