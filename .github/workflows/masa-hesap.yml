@@ -1,0 +1,35 @@
+# Profesör hesap simülasyonu: "N gün önce X USDT ile açık olsa ne olurdu" (test/masa-hesap.js). MEXC açık verisi; anahtar yok, emir yok.
+name: masa-hesap
+
+on:
+  workflow_dispatch:
+    inputs:
+      gun:
+        description: 'Kaç gün geriye'
+        default: '30'
+      usdt:
+        description: 'Başlangıç özkaynağı (USDT)'
+        default: '100'
+
+permissions:
+  contents: read
+
+jobs:
+  hesap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Testler
+        run: node test/masa.test.js && node test/masa-hesap.test.js
+      - name: Simülasyon
+        run: node test/masa-hesap.js "${{ github.event.inputs.gun || '30' }}" "${{ github.event.inputs.usdt || '100' }}" 40 "$RUNNER_TEMP/masa-hesap.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: masa-hesap
+          path: ${{ runner.temp }}/masa-hesap.json
